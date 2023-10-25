@@ -1,22 +1,25 @@
-// SPDX-License-Identifier: GPL-3.0
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
 
-pragma solidity 0.8.6;
+import { IERC20 } from "openzeppelin-contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
+import { TwabController } from "pt-v5-twab-controller/TwabController.sol";
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@pooltogether/v4-core/contracts/interfaces/ITicket.sol";
+import { ITwabRewards, Promotion } from "./interfaces/ITwabRewards.sol";
 
-import "./interfaces/ITwabRewards.sol";
+/* ============ Custom Errors ============ */
+
+/// @notice Thrown when the TwabController address set in the constructor is the zero address.
+error TwabControllerZeroAddress();
 
 /**
- * @title PoolTogether V4 TwabRewards
- * @author PoolTogether Inc Team
- * @notice Contract to distribute rewards to depositors in a pool.
+ * @title PoolTogether V5 TwabRewards
+ * @author PoolTogether Inc. & G9 Software Inc.
+ * @notice Contract to distribute rewards to depositors in a PoolTogether V5 Vault.
  * This contract supports the creation of several promotions that can run simultaneously.
- * In order to calculate user rewards, we use the TWAB (Time-Weighted Average Balance) from the Ticket contract.
- * This way, users simply need to hold their tickets to be eligible to claim rewards.
- * Rewards are calculated based on the average amount of tickets they hold during the epoch duration.
- * @dev This contract supports only one prize pool ticket.
+ * In order to calculate user rewards, we use the TWAB (Time-Weighted Average Balance) for the vault and depositor.
+ * This way, users simply need to hold their vault tokens to be eligible to claim rewards.
+ * Rewards are calculated based on the average amount of vault tokens they hold during the epoch duration.
  * @dev This contract does not support the use of fee on transfer tokens.
  */
 contract TwabRewards is ITwabRewards {
@@ -24,8 +27,8 @@ contract TwabRewards is ITwabRewards {
 
     /* ============ Global Variables ============ */
 
-    /// @notice Prize pool ticket for which the promotions are created.
-    ITicket public immutable ticket;
+    /// @notice TwabController contract from which the promotions read time-weighted average balances from.
+    TwabController public immutable twabController;
 
     /// @notice Period during which the promotion owner can't destroy a promotion.
     uint32 public constant GRACE_PERIOD = 60 days;
@@ -51,8 +54,10 @@ contract TwabRewards is ITwabRewards {
     /**
      * @notice Emitted when a promotion is created.
      * @param promotionId Id of the newly created promotion
+     * @param vault The address of the vault that the promotion applies to
+     * @param token The token that will be rewarded from the promotion
      */
-    event PromotionCreated(uint256 indexed promotionId);
+    event PromotionCreated(uint256 indexed promotionId, address indexed vault, IERC20 indexed token);
 
     /**
      * @notice Emitted when a promotion is ended.
@@ -91,17 +96,18 @@ contract TwabRewards is ITwabRewards {
 
     /**
      * @notice Constructor of the contract.
-     * @param _ticket Prize Pool ticket address for which the promotions will be created
+     * @param _twabController The TwabController contract to reference for vault balance and supply
      */
-    constructor(ITicket _ticket) {
-        _requireTicket(_ticket);
-        ticket = _ticket;
+    constructor(TwabController _twabController) {
+        if (address(0) == address(_twabController)) revert TwabControllerZeroAddress();
+        twabController = _twabController;
     }
 
     /* ============ External Functions ============ */
 
     /// @inheritdoc ITwabRewards
     function createPromotion(
+        address _vault,
         IERC20 _token,
         uint64 _startTimestamp,
         uint256 _tokensPerEpoch,
@@ -121,6 +127,7 @@ contract TwabRewards is ITwabRewards {
             creator: msg.sender,
             startTimestamp: _startTimestamp,
             numberOfEpochs: _numberOfEpochs,
+            vault: _vault,
             epochDuration: _epochDuration,
             createdAt: uint48(block.timestamp),
             token: _token,
@@ -136,7 +143,7 @@ contract TwabRewards is ITwabRewards {
 
         require(_beforeBalance + _amount == _afterBalance, "TwabRewards/promo-amount-diff");
 
-        emit PromotionCreated(_nextPromotionId);
+        emit PromotionCreated(_nextPromotionId, _vault, _token);
 
         return _nextPromotionId;
     }
@@ -282,20 +289,6 @@ contract TwabRewards is ITwabRewards {
     /* ============ Internal Functions ============ */
 
     /**
-     * @notice Determine if address passed is actually a ticket.
-     * @param _ticket Address to check
-     */
-    function _requireTicket(ITicket _ticket) internal view {
-        require(address(_ticket) != address(0), "TwabRewards/ticket-not-zero-addr");
-
-        (bool succeeded, bytes memory data) = address(_ticket).staticcall(
-            abi.encodePacked(_ticket.controller.selector)
-        );
-
-        require(succeeded && data.length > 0 && abi.decode(data, (uint160)) != 0, "TwabRewards/invalid-ticket");
-    }
-
-    /**
      * @notice Allow a promotion to be created or extended only by a positive number of epochs.
      * @param _numberOfEpochs Number of epochs to check
      */
@@ -367,7 +360,7 @@ contract TwabRewards is ITwabRewards {
      * @notice Get reward amount for a specific user.
      * @dev Rewards can only be calculated once the epoch is over.
      * @dev Will revert if `_epochId` is over the total number of epochs or if epoch is not over.
-     * @dev Will return 0 if the user average balance of tickets is 0.
+     * @dev Will return 0 if the user average balance in the vault is 0.
      * @param _user User to get reward amount for
      * @param _promotion Promotion from which the epoch is
      * @param _epochId Epoch id to get reward amount for
@@ -385,20 +378,19 @@ contract TwabRewards is ITwabRewards {
         require(block.timestamp >= _epochEndTimestamp, "TwabRewards/epoch-not-over");
         require(_epochId < _promotion.numberOfEpochs, "TwabRewards/invalid-epoch-id");
 
-        uint256 _averageBalance = ticket.getAverageBalanceBetween(_user, _epochStartTimestamp, _epochEndTimestamp);
+        uint256 _averageBalance = twabController.getTwabBetween(
+            _promotion.vault,
+            _user,
+            _epochStartTimestamp,
+            _epochEndTimestamp
+        );
 
         if (_averageBalance > 0) {
-            uint64[] memory _epochStartTimestamps = new uint64[](1);
-            _epochStartTimestamps[0] = _epochStartTimestamp;
-
-            uint64[] memory _epochEndTimestamps = new uint64[](1);
-            _epochEndTimestamps[0] = _epochEndTimestamp;
-
-            uint256 _averageTotalSupply = ticket.getAverageTotalSuppliesBetween(
-                _epochStartTimestamps,
-                _epochEndTimestamps
-            )[0];
-
+            uint256 _averageTotalSupply = twabController.getTotalSupplyTwabBetween(
+                _promotion.vault,
+                _epochStartTimestamp,
+                _epochEndTimestamp
+            );
             return (_promotion.tokensPerEpoch * _averageBalance) / _averageTotalSupply;
         }
 
