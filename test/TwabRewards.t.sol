@@ -124,7 +124,6 @@ contract TwabRewardsTest is Test {
             epochDuration,
             numberOfEpochs
         );
-        vm.warp(_startTimestamp);
         vm.stopPrank();
     }
 
