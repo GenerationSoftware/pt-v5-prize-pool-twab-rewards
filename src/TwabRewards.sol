@@ -26,7 +26,7 @@ error ZeroEpochs();
 /// @param expected The expected amount of tokens
 error TokensReceivedLessThanExpected(uint256 received, uint256 expected);
 
-/// @notice Thrown if the address to receive tokens is the zero address.
+/// @notice Thrown if the address to receive tokens from ending or destroying a promotion is the zero address.
 error PayeeZeroAddress();
 
 /// @notice Thrown if an action cannot be completed while the grace period is active.
