@@ -62,7 +62,7 @@ interface ITwabRewards {
      * @dev Will only send back tokens from the epochs that have not completed.
      * @param _promotionId Promotion id to end
      * @param _to Address that will receive the remaining tokens if there are any left
-     * @return true if operation was successful
+     * @return True if operation was successful
      */
     function endPromotion(uint256 _promotionId, address _to) external returns (bool);
 
