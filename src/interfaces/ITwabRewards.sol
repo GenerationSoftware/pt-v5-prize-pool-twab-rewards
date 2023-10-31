@@ -35,11 +35,6 @@ struct Promotion {
 interface ITwabRewards {
     /**
      * @notice Creates a new promotion.
-     * @dev For sake of simplicity, `msg.sender` will be the creator of the promotion.
-     * @dev `_latestPromotionId` starts at 0 and is incremented by 1 for each new promotion.
-     * So the first promotion will have id 1, the second 2, etc.
-     * @dev The transaction will revert if the amount of reward tokens provided is not equal to `_tokensPerEpoch * _numberOfEpochs`.
-     * This scenario could happen if the token supplied is a fee on transfer one.
      * @param vault Address of the vault that the promotion applies to
      * @param token Address of the token to be distributed
      * @param startTimestamp Timestamp at which the promotion starts
@@ -105,7 +100,6 @@ interface ITwabRewards {
 
     /**
      * @notice Get the current epoch id of a promotion.
-     * @dev Epoch ids and their boolean values are tightly packed and stored in a uint256, so epoch id starts at 0.
      * @param promotionId Id of the promotion to get current epoch for
      * @return Current epoch id of the promotion
      */

@@ -172,7 +172,14 @@ contract TwabRewards is ITwabRewards {
 
     /* ============ External Functions ============ */
 
-    /// @inheritdoc ITwabRewards
+    /**
+     * @inheritdoc ITwabRewards
+     * @dev For sake of simplicity, `msg.sender` will be the creator of the promotion.
+     * @dev `_latestPromotionId` starts at 0 and is incremented by 1 for each new promotion.
+     * So the first promotion will have id 1, the second 2, etc.
+     * @dev The transaction will revert if the amount of reward tokens provided is not equal to `_tokensPerEpoch * _numberOfEpochs`.
+     * This scenario could happen if the token supplied is a fee on transfer one.
+     */
     function createPromotion(
         address _vault,
         IERC20 _token,
@@ -333,6 +340,7 @@ contract TwabRewards is ITwabRewards {
     }
 
     /// @inheritdoc ITwabRewards
+    /// @dev Epoch ids and their boolean values are tightly packed and stored in a uint256, so epoch id starts at 0.
     function getCurrentEpochId(uint256 _promotionId) external view override returns (uint256) {
         return _getCurrentEpochId(_getPromotion(_promotionId));
     }
