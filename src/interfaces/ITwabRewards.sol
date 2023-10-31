@@ -40,98 +40,98 @@ interface ITwabRewards {
      * So the first promotion will have id 1, the second 2, etc.
      * @dev The transaction will revert if the amount of reward tokens provided is not equal to `_tokensPerEpoch * _numberOfEpochs`.
      * This scenario could happen if the token supplied is a fee on transfer one.
-     * @param _vault Address of the vault that the promotion applies to
-     * @param _token Address of the token to be distributed
-     * @param _startTimestamp Timestamp at which the promotion starts
-     * @param _tokensPerEpoch Number of tokens to be distributed per epoch
-     * @param _epochDuration Duration of one epoch in seconds
-     * @param _numberOfEpochs Number of epochs the promotion will last for
+     * @param vault Address of the vault that the promotion applies to
+     * @param token Address of the token to be distributed
+     * @param startTimestamp Timestamp at which the promotion starts
+     * @param tokensPerEpoch Number of tokens to be distributed per epoch
+     * @param epochDuration Duration of one epoch in seconds
+     * @param numberOfEpochs Number of epochs the promotion will last for
      * @return Id of the newly created promotion
      */
     function createPromotion(
-        address _vault,
-        IERC20 _token,
-        uint64 _startTimestamp,
-        uint256 _tokensPerEpoch,
-        uint48 _epochDuration,
-        uint8 _numberOfEpochs
+        address vault,
+        IERC20 token,
+        uint64 startTimestamp,
+        uint256 tokensPerEpoch,
+        uint48 epochDuration,
+        uint8 numberOfEpochs
     ) external returns (uint256);
 
     /**
      * @notice End currently active promotion and send promotion tokens back to the creator.
      * @dev Will only send back tokens from the epochs that have not completed.
-     * @param _promotionId Promotion id to end
-     * @param _to Address that will receive the remaining tokens if there are any left
+     * @param promotionId Promotion id to end
+     * @param to Address that will receive the remaining tokens if there are any left
      * @return True if operation was successful
      */
-    function endPromotion(uint256 _promotionId, address _to) external returns (bool);
+    function endPromotion(uint256 promotionId, address to) external returns (bool);
 
     /**
      * @notice Delete an inactive promotion and send promotion tokens back to the creator.
      * @dev Will send back all the tokens that have not been claimed yet by users.
      * @dev This function will revert if the promotion is still active.
      * @dev This function will revert if the grace period is not over yet.
-     * @param _promotionId Promotion id to destroy
-     * @param _to Address that will receive the remaining tokens if there are any left
+     * @param promotionId Promotion id to destroy
+     * @param to Address that will receive the remaining tokens if there are any left
      * @return True if operation was successful
      */
-    function destroyPromotion(uint256 _promotionId, address _to) external returns (bool);
+    function destroyPromotion(uint256 promotionId, address to) external returns (bool);
 
     /**
      * @notice Extend promotion by adding more epochs.
-     * @param _promotionId Id of the promotion to extend
-     * @param _numberOfEpochs Number of epochs to add
+     * @param promotionId Id of the promotion to extend
+     * @param numberOfEpochs Number of epochs to add
      * @return True if the operation was successful
      */
-    function extendPromotion(uint256 _promotionId, uint8 _numberOfEpochs) external returns (bool);
+    function extendPromotion(uint256 promotionId, uint8 numberOfEpochs) external returns (bool);
 
     /**
      * @notice Claim rewards for a given promotion and epoch.
      * @dev Rewards can be claimed on behalf of a user.
      * @dev Rewards can only be claimed for a past epoch.
-     * @param _user Address of the user to claim rewards for
-     * @param _promotionId Id of the promotion to claim rewards for
-     * @param _epochIds Epoch ids to claim rewards for
+     * @param user Address of the user to claim rewards for
+     * @param promotionId Id of the promotion to claim rewards for
+     * @param epochIds Epoch ids to claim rewards for
      * @return Total amount of rewards claimed
      */
-    function claimRewards(address _user, uint256 _promotionId, uint8[] calldata _epochIds) external returns (uint256);
+    function claimRewards(address user, uint256 promotionId, uint8[] calldata epochIds) external returns (uint256);
 
     /**
      * @notice Get settings for a specific promotion.
-     * @param _promotionId Id of the promotion to get settings for
+     * @param promotionId Id of the promotion to get settings for
      * @return Promotion settings
      */
-    function getPromotion(uint256 _promotionId) external view returns (Promotion memory);
+    function getPromotion(uint256 promotionId) external view returns (Promotion memory);
 
     /**
      * @notice Get the current epoch id of a promotion.
      * @dev Epoch ids and their boolean values are tightly packed and stored in a uint256, so epoch id starts at 0.
-     * @param _promotionId Id of the promotion to get current epoch for
+     * @param promotionId Id of the promotion to get current epoch for
      * @return Current epoch id of the promotion
      */
-    function getCurrentEpochId(uint256 _promotionId) external view returns (uint256);
+    function getCurrentEpochId(uint256 promotionId) external view returns (uint256);
 
     /**
      * @notice Get the total amount of tokens left to be rewarded.
-     * @param _promotionId Id of the promotion to get the total amount of tokens left to be rewarded for
+     * @param promotionId Id of the promotion to get the total amount of tokens left to be rewarded for
      * @return Amount of tokens left to be rewarded
      */
-    function getRemainingRewards(uint256 _promotionId) external view returns (uint256);
+    function getRemainingRewards(uint256 promotionId) external view returns (uint256);
 
     /**
      * @notice Get amount of tokens to be rewarded for a given epoch.
      * @dev Rewards amount can only be retrieved for epochs that are over.
-     * @dev Will revert if `_epochId` is over the total number of epochs or if epoch is not over.
+     * @dev Will revert if `epochId` is over the total number of epochs or if epoch is not over.
      * @dev Will return 0 if the user average balance for the promoted vault is 0.
      * @dev Will be 0 if user has already claimed rewards for the epoch.
-     * @param _user Address of the user to get amount of rewards for
-     * @param _promotionId Id of the promotion from which the epoch is
-     * @param _epochIds Epoch ids to get reward amount for
+     * @param user Address of the user to get amount of rewards for
+     * @param promotionId Id of the promotion from which the epoch is
+     * @param epochIds Epoch ids to get reward amount for
      * @return Amount of tokens per epoch to be rewarded
      */
     function getRewardsAmount(
-        address _user,
-        uint256 _promotionId,
-        uint8[] calldata _epochIds
+        address user,
+        uint256 promotionId,
+        uint8[] calldata epochIds
     ) external view returns (uint256[] memory);
 }
