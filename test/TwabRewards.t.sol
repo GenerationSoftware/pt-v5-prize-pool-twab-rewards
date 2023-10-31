@@ -328,7 +328,7 @@ contract TwabRewardsTest is Test {
         twabRewards.claimRewards(wallet1, promotionId, epochIds);
         twabRewards.claimRewards(wallet2, promotionId, epochIds);
 
-        vm.warp(epochDuration * numberOfEpochs + promotionStartTime + 5184000);
+        vm.warp(epochDuration * numberOfEpochs + promotionStartTime + 60 days);
 
         uint256 _refundAmount = numberOfEpochs *
             tokensPerEpoch -
