@@ -40,7 +40,7 @@ contract TwabRewardsTest is Test {
     uint32 twabPeriodLength = 1 hours;
     uint32 twabPeriodOffset = 0;
 
-    uint64 promotionStartTime = 0;
+    uint64 promotionStartTime = 1 days;
     uint64 promotionCreatedAt = 0;
 
     uint256 tokensPerEpoch = 10000e18;
@@ -269,8 +269,8 @@ contract TwabRewardsTest is Test {
         twabController.mint(wallet2, uint96((totalShares * 1) / 4));
         vm.stopPrank();
 
-        uint256 wallet1RewardAmount = (numEpochsPassed * (tokensPerEpoch * 3)) / 4;
-        uint256 wallet2RewardAmount = (numEpochsPassed * (tokensPerEpoch * 1)) / 4;
+        uint256 wallet1RewardAmount = numEpochsPassed * ((tokensPerEpoch * 3) / 4);
+        uint256 wallet2RewardAmount = numEpochsPassed * ((tokensPerEpoch * 1) / 4);
 
         vm.warp(numEpochsPassed * epochDuration + promotionStartTime);
 
@@ -283,12 +283,12 @@ contract TwabRewardsTest is Test {
         balanceBefore = mockToken.balanceOf(wallet1);
         twabRewards.claimRewards(wallet1, promotionId, epochIds);
         balanceAfter = mockToken.balanceOf(wallet1);
-        assertApproxEqAbs(balanceAfter - balanceBefore, wallet1RewardAmount, 10);
+        assertEq(balanceAfter - balanceBefore, wallet1RewardAmount);
 
         balanceBefore = mockToken.balanceOf(wallet2);
         twabRewards.claimRewards(wallet2, promotionId, epochIds);
         balanceAfter = mockToken.balanceOf(wallet2);
-        assertApproxEqAbs(balanceAfter - balanceBefore, wallet2RewardAmount, 10);
+        assertEq(balanceAfter - balanceBefore, wallet2RewardAmount);
     }
 
     function testEndPromotion_OnlyPromotionCreator() external {
