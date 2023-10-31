@@ -33,7 +33,7 @@ error PayeeZeroAddress();
 /// @param gracePeriodEndTimestamp The end timestamp of the grace period
 error GracePeriodActive(uint256 gracePeriodEndTimestamp);
 
-/// @notice Thrown if an promotion extension would exceed the max number of epochs.
+/// @notice Thrown if a promotion extension would exceed the max number of epochs.
 /// @param epochExtension The number of epochs to extend the promotion by
 /// @param currentEpochs The current number of epochs in the promotion
 /// @param maxEpochs The max number of epochs that a promotion can have
