@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity 0.8.19;
 
 import { IERC20 } from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
@@ -112,11 +112,7 @@ contract TwabRewards is ITwabRewards {
      * @param vault The address of the vault that the promotion applies to
      * @param token The token that will be rewarded from the promotion
      */
-    event PromotionCreated(
-        uint256 indexed promotionId,
-        address indexed vault,
-        IERC20 indexed token
-    );
+    event PromotionCreated(uint256 indexed promotionId, address indexed vault, IERC20 indexed token);
 
     /**
      * @notice Emitted when a promotion is ended.
@@ -210,11 +206,7 @@ contract TwabRewards is ITwabRewards {
         if (_afterBalance < _beforeBalance + _amount)
             revert TokensReceivedLessThanExpected(_afterBalance - _beforeBalance, _amount);
 
-        emit PromotionCreated(
-            _nextPromotionId,
-            _vault,
-            _token
-        );
+        emit PromotionCreated(_nextPromotionId, _vault, _token);
 
         return _nextPromotionId;
     }

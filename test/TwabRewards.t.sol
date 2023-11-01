@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity 0.8.19;
 
 import "forge-std/Test.sol";
 import { IERC20 } from "openzeppelin-contracts/token/ERC20/IERC20.sol";
@@ -52,11 +52,7 @@ contract TwabRewardsTest is Test {
 
     /* ============ Events ============ */
 
-    event PromotionCreated(
-        uint256 indexed promotionId,
-        address indexed vault,
-        IERC20 indexed token
-    );
+    event PromotionCreated(uint256 indexed promotionId, address indexed vault, IERC20 indexed token);
     event PromotionEnded(uint256 indexed promotionId, address indexed recipient, uint256 amount, uint8 epochNumber);
     event PromotionDestroyed(uint256 indexed promotionId, address indexed recipient, uint256 amount);
     event PromotionExtended(uint256 indexed promotionId, uint256 numberOfEpochs);
@@ -103,11 +99,7 @@ contract TwabRewardsTest is Test {
         uint64 _startTimestamp = 1 days;
         uint256 _promotionId = 2;
         vm.expectEmit();
-        emit PromotionCreated(
-            _promotionId,
-            vaultAddress,
-            IERC20(mockToken)
-        );
+        emit PromotionCreated(_promotionId, vaultAddress, IERC20(mockToken));
         twabRewards.createPromotion(
             vaultAddress,
             mockToken,
