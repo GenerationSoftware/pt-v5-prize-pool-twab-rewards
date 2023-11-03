@@ -3,6 +3,7 @@ pragma solidity 0.8.19;
 
 import { IERC20 } from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
+import { Multicall } from "openzeppelin-contracts/utils/Multicall.sol";
 import { TwabController } from "pt-v5-twab-controller/TwabController.sol";
 
 import { ITwabRewards, Promotion } from "./interfaces/ITwabRewards.sol";
@@ -86,7 +87,7 @@ error StartTimeNotAlignedWithTwabPeriod(uint64 startTimePeriodOffset);
  * Rewards are calculated based on the average amount of vault tokens they hold during the epoch duration.
  * @dev This contract does not support the use of fee on transfer tokens.
  */
-contract TwabRewards is ITwabRewards {
+contract TwabRewards is ITwabRewards, Multicall {
     using SafeERC20 for IERC20;
 
     /* ============ Global Variables ============ */

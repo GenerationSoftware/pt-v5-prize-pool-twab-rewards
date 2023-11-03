@@ -753,6 +753,54 @@ contract TwabRewardsTest is Test {
         assertEq(mockToken.balanceOf(wallet1), (numEpochsPassed * (tokensPerEpoch * 3)) / 4);
     }
 
+    function testClaimRewards_Multicall() external {
+        uint8 numEpochsPassed = 3;
+        uint8[] memory epochIds = new uint8[](3);
+        epochIds[0] = 0;
+        epochIds[1] = 1;
+        epochIds[2] = 2;
+
+        uint256 totalShares = 1000e18;
+        vm.warp(0);
+        vm.startPrank(vaultAddress);
+        twabController.mint(wallet1, uint96((totalShares * 3) / 4));
+        twabController.mint(wallet2, uint96((totalShares * 1) / 4));
+        vm.stopPrank();
+
+        // Create second promotion with a different vault
+        uint256 amount = tokensPerEpoch * numberOfEpochs;
+        mockToken.mint(address(this), amount);
+        mockToken.approve(address(twabRewards), amount);
+        address secondVaultAddress = wallet3;
+        uint256 secondPromotionId = 
+            twabRewards.createPromotion(
+                secondVaultAddress,
+                mockToken,
+                promotionStartTime,
+                tokensPerEpoch,
+                epochDuration,
+                numberOfEpochs
+            );
+
+        vm.warp(0);
+        vm.startPrank(secondVaultAddress);
+        twabController.mint(wallet1, 1e18);
+        vm.stopPrank();
+
+        bytes[] memory data = new bytes[](2);
+        data[0] = abi.encodeWithSelector(twabRewards.claimRewards.selector, wallet1, promotionId, epochIds);
+        data[1] = abi.encodeWithSelector(twabRewards.claimRewards.selector, wallet1, secondPromotionId, epochIds);
+
+        vm.warp(promotionStartTime + epochDuration * numEpochsPassed);
+        vm.expectEmit();
+        emit RewardsClaimed(promotionId, epochIds, wallet1, (numEpochsPassed * (tokensPerEpoch * 3)) / 4);
+        vm.expectEmit();
+        emit RewardsClaimed(secondPromotionId, epochIds, wallet1, tokensPerEpoch * 3);
+        twabRewards.multicall(data);
+
+        assertEq(mockToken.balanceOf(wallet1), tokensPerEpoch * 3 + (numEpochsPassed * (tokensPerEpoch * 3)) / 4);
+    }
+
     function testClaimRewards_DecreasedDelegateBalance() external {
         uint8[] memory epochIds = new uint8[](1);
         epochIds[0] = 0;
