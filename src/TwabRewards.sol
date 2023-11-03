@@ -191,7 +191,8 @@ contract TwabRewards is ITwabRewards, Multicall {
         _requireNumberOfEpochs(_numberOfEpochs);
 
         uint32 _twabPeriodLength = twabController.PERIOD_LENGTH();
-        if (_epochDuration % _twabPeriodLength != 0) revert EpochDurationNotMultipleOfTwabPeriod(_epochDuration, _twabPeriodLength);
+        if (_epochDuration % _twabPeriodLength != 0)
+            revert EpochDurationNotMultipleOfTwabPeriod(_epochDuration, _twabPeriodLength);
         uint64 _startTimePeriodOffset = (_startTimestamp - twabController.PERIOD_OFFSET()) % _twabPeriodLength;
         if (_startTimePeriodOffset != 0) revert StartTimeNotAlignedWithTwabPeriod(_startTimePeriodOffset);
 

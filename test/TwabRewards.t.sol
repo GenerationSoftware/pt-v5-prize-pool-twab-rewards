@@ -187,7 +187,13 @@ contract TwabRewardsTest is Test {
     }
 
     function testCreatePromotion_EpochDurationNotMultipleOfTwabPeriod() external {
-        vm.expectRevert(abi.encodeWithSelector(EpochDurationNotMultipleOfTwabPeriod.selector, twabPeriodLength / 2, twabPeriodLength));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                EpochDurationNotMultipleOfTwabPeriod.selector,
+                twabPeriodLength / 2,
+                twabPeriodLength
+            )
+        );
         twabRewards.createPromotion(
             vaultAddress,
             mockToken,
@@ -702,7 +708,14 @@ contract TwabRewardsTest is Test {
         uint256 amount = tokensPerEpoch * numberOfEpochs;
         mockToken.mint(address(this), amount);
         mockToken.approve(address(twabRewards), amount);
-        uint256 offsetPromotionId = twabRewards.createPromotion(vaultAddress, mockToken, offsetStartTime, tokensPerEpoch, offsetEpochDuration, numberOfEpochs);
+        uint256 offsetPromotionId = twabRewards.createPromotion(
+            vaultAddress,
+            mockToken,
+            offsetStartTime,
+            tokensPerEpoch,
+            offsetEpochDuration,
+            numberOfEpochs
+        );
 
         uint8[] memory epochIds = new uint8[](1);
         epochIds[0] = 0;
@@ -772,15 +785,14 @@ contract TwabRewardsTest is Test {
         mockToken.mint(address(this), amount);
         mockToken.approve(address(twabRewards), amount);
         address secondVaultAddress = wallet3;
-        uint256 secondPromotionId = 
-            twabRewards.createPromotion(
-                secondVaultAddress,
-                mockToken,
-                promotionStartTime,
-                tokensPerEpoch,
-                epochDuration,
-                numberOfEpochs
-            );
+        uint256 secondPromotionId = twabRewards.createPromotion(
+            secondVaultAddress,
+            mockToken,
+            promotionStartTime,
+            tokensPerEpoch,
+            epochDuration,
+            numberOfEpochs
+        );
 
         vm.warp(0);
         vm.startPrank(secondVaultAddress);
