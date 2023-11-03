@@ -3,6 +3,7 @@ pragma solidity 0.8.19;
 
 import { IERC20 } from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
+import { Multicall } from "openzeppelin-contracts/utils/Multicall.sol";
 import { TwabController } from "pt-v5-twab-controller/TwabController.sol";
 
 import { ITwabRewards, Promotion } from "./interfaces/ITwabRewards.sol";
@@ -67,6 +68,15 @@ error EpochNotOver(uint64 epochEndTimestamp);
 /// @param numberOfEpochs The number of epochs in the promotion
 error InvalidEpochId(uint8 epochId, uint8 numberOfEpochs);
 
+/// @notice Thrown if an epoch duration is not a multiple of the TWAB period length.
+/// @param epochDuration The duration of the epoch in seconds
+/// @param twabPeriodLength The duration of the TWAB period in seconds
+error EpochDurationNotMultipleOfTwabPeriod(uint48 epochDuration, uint32 twabPeriodLength);
+
+/// @notice Thrown if a promotion start time is not aligned with the start of a TWAB period.
+/// @param startTimePeriodOffset The offset in seconds of the promotion start time from the start of the TWAB period it succeeds
+error StartTimeNotAlignedWithTwabPeriod(uint64 startTimePeriodOffset);
+
 /**
  * @title PoolTogether V5 TwabRewards
  * @author PoolTogether Inc. & G9 Software Inc.
@@ -77,7 +87,7 @@ error InvalidEpochId(uint8 epochId, uint8 numberOfEpochs);
  * Rewards are calculated based on the average amount of vault tokens they hold during the epoch duration.
  * @dev This contract does not support the use of fee on transfer tokens.
  */
-contract TwabRewards is ITwabRewards {
+contract TwabRewards is ITwabRewards, Multicall {
     using SafeERC20 for IERC20;
 
     /* ============ Global Variables ============ */
@@ -179,6 +189,12 @@ contract TwabRewards is ITwabRewards {
         if (_tokensPerEpoch == 0) revert ZeroTokensPerEpoch();
         if (_epochDuration == 0) revert ZeroEpochDuration();
         _requireNumberOfEpochs(_numberOfEpochs);
+
+        uint32 _twabPeriodLength = twabController.PERIOD_LENGTH();
+        if (_epochDuration % _twabPeriodLength != 0)
+            revert EpochDurationNotMultipleOfTwabPeriod(_epochDuration, _twabPeriodLength);
+        uint64 _startTimePeriodOffset = (_startTimestamp - twabController.PERIOD_OFFSET()) % _twabPeriodLength;
+        if (_startTimePeriodOffset != 0) revert StartTimeNotAlignedWithTwabPeriod(_startTimePeriodOffset);
 
         uint256 _nextPromotionId = _latestPromotionId + 1;
         _latestPromotionId = _nextPromotionId;
