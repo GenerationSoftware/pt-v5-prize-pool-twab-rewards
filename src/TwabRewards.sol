@@ -67,6 +67,15 @@ error EpochNotOver(uint64 epochEndTimestamp);
 /// @param numberOfEpochs The number of epochs in the promotion
 error InvalidEpochId(uint8 epochId, uint8 numberOfEpochs);
 
+/// @notice Thrown if an epoch duration is not a multiple of the TWAB period length.
+/// @param epochDuration The duration of the epoch in seconds
+/// @param twabPeriodLength The duration of the TWAB period in seconds
+error EpochDurationNotMultipleOfTwabPeriod(uint48 epochDuration, uint32 twabPeriodLength);
+
+/// @notice Thrown if a promotion start time is not aligned with the start of a TWAB period.
+/// @param startTimePeriodOffset The offset in seconds of the promotion start time from the start of the TWAB period it succeeds
+error StartTimeNotAlignedWithTwabPeriod(uint64 startTimePeriodOffset);
+
 /**
  * @title PoolTogether V5 TwabRewards
  * @author PoolTogether Inc. & G9 Software Inc.
@@ -179,6 +188,11 @@ contract TwabRewards is ITwabRewards {
         if (_tokensPerEpoch == 0) revert ZeroTokensPerEpoch();
         if (_epochDuration == 0) revert ZeroEpochDuration();
         _requireNumberOfEpochs(_numberOfEpochs);
+
+        uint32 _twabPeriodLength = twabController.PERIOD_LENGTH();
+        if (_epochDuration % _twabPeriodLength != 0) revert EpochDurationNotMultipleOfTwabPeriod(_epochDuration, _twabPeriodLength);
+        uint64 _startTimePeriodOffset = (_startTimestamp - twabController.PERIOD_OFFSET()) % _twabPeriodLength;
+        if (_startTimePeriodOffset != 0) revert StartTimeNotAlignedWithTwabPeriod(_startTimePeriodOffset);
 
         uint256 _nextPromotionId = _latestPromotionId + 1;
         _latestPromotionId = _nextPromotionId;
