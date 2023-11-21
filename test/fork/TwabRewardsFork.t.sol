@@ -75,7 +75,15 @@ contract TwabRewardsForkTest is Test {
 
     /* ============ Events ============ */
 
-    event PromotionCreated(uint256 indexed promotionId, address indexed vault, IERC20 indexed token);
+    event PromotionCreated(
+        uint256 indexed promotionId,
+        address indexed vault,
+        IERC20 indexed token,
+        uint64 startTimestamp,
+        uint256 tokensPerEpoch,
+        uint48 epochDuration,
+        uint8 initialNumberOfEpochs
+    );
     event PromotionEnded(uint256 indexed promotionId, address indexed recipient, uint256 amount, uint8 epochNumber);
     event PromotionDestroyed(uint256 indexed promotionId, address indexed recipient, uint256 amount);
     event PromotionExtended(uint256 indexed promotionId, uint256 numberOfEpochs);
@@ -163,7 +171,15 @@ contract TwabRewardsForkTest is Test {
 
             // Setup new OP token promotions on pUSDC.e vault and pweth vault
             vm.expectEmit();
-            emit PromotionCreated(1 + 2 * i, pusdce, tokenTestCases[i].token);
+            emit PromotionCreated(
+                1 + 2 * i,
+                pusdce,
+                tokenTestCases[i].token,
+                startTimestamp,
+                tokenTestCases[i].tokensPerEpochPusdce,
+                epochDuration,
+                numberOfEpochs
+            );
             uint256 pusdcePromotionId = twabRewards.createPromotion(
                 pusdce,
                 tokenTestCases[i].token,
@@ -175,7 +191,15 @@ contract TwabRewardsForkTest is Test {
             assertEq(pusdcePromotionId, 1 + 2 * i);
 
             vm.expectEmit();
-            emit PromotionCreated(2 + 2 * i, pweth, tokenTestCases[i].token);
+            emit PromotionCreated(
+                2 + 2 * i,
+                pweth,
+                tokenTestCases[i].token,
+                startTimestamp,
+                tokenTestCases[i].tokensPerEpochPweth,
+                epochDuration,
+                numberOfEpochs
+            );
             uint256 pwethPromotionId = twabRewards.createPromotion(
                 pweth,
                 tokenTestCases[i].token,

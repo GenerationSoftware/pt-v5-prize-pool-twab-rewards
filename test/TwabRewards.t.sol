@@ -54,7 +54,15 @@ contract TwabRewardsTest is Test {
 
     /* ============ Events ============ */
 
-    event PromotionCreated(uint256 indexed promotionId, address indexed vault, IERC20 indexed token);
+    event PromotionCreated(
+        uint256 indexed promotionId,
+        address indexed vault,
+        IERC20 indexed token,
+        uint64 startTimestamp,
+        uint256 tokensPerEpoch,
+        uint48 epochDuration,
+        uint8 initialNumberOfEpochs
+    );
     event PromotionEnded(uint256 indexed promotionId, address indexed recipient, uint256 amount, uint8 epochNumber);
     event PromotionDestroyed(uint256 indexed promotionId, address indexed recipient, uint256 amount);
     event PromotionExtended(uint256 indexed promotionId, uint256 numberOfEpochs);
@@ -101,7 +109,15 @@ contract TwabRewardsTest is Test {
         uint64 _startTimestamp = 1 days;
         uint256 _promotionId = 2;
         vm.expectEmit();
-        emit PromotionCreated(_promotionId, vaultAddress, IERC20(mockToken));
+        emit PromotionCreated(
+            _promotionId,
+            vaultAddress,
+            IERC20(mockToken),
+            _startTimestamp,
+            tokensPerEpoch,
+            epochDuration,
+            numberOfEpochs
+        );
         twabRewards.createPromotion(
             vaultAddress,
             mockToken,

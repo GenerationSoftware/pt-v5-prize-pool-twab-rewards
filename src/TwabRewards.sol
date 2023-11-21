@@ -121,8 +121,20 @@ contract TwabRewards is ITwabRewards, Multicall {
      * @param promotionId Id of the newly created promotion
      * @param vault The address of the vault that the promotion applies to
      * @param token The token that will be rewarded from the promotion
+     * @param startTimestamp The timestamp at which the promotion starts
+     * @param tokensPerEpoch The number of tokens emitted per epoch
+     * @param epochDuration The duration of epoch in seconds
+     * @param initialNumberOfEpochs The initial number of epochs the promotion is set to run for
      */
-    event PromotionCreated(uint256 indexed promotionId, address indexed vault, IERC20 indexed token);
+    event PromotionCreated(
+        uint256 indexed promotionId,
+        address indexed vault,
+        IERC20 indexed token,
+        uint64 startTimestamp,
+        uint256 tokensPerEpoch,
+        uint48 epochDuration,
+        uint8 initialNumberOfEpochs
+    );
 
     /**
      * @notice Emitted when a promotion is ended.
@@ -222,7 +234,15 @@ contract TwabRewards is ITwabRewards, Multicall {
         if (_afterBalance < _beforeBalance + _amount)
             revert TokensReceivedLessThanExpected(_afterBalance - _beforeBalance, _amount);
 
-        emit PromotionCreated(_nextPromotionId, _vault, _token);
+        emit PromotionCreated(
+            _nextPromotionId,
+            _vault,
+            _token,
+            _startTimestamp,
+            _tokensPerEpoch,
+            _epochDuration,
+            _numberOfEpochs
+        );
 
         return _nextPromotionId;
     }
