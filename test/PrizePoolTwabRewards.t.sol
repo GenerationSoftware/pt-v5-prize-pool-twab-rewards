@@ -528,6 +528,36 @@ contract PrizePoolTwabRewardsTest is Test {
         assertEq(twabRewards.getRemainingRewards(promotionId), 0);
     }
 
+    /* ============ epochRangesForPromotion ============ */
+
+    function testEpochRangesForPromotion() public {
+        (
+            uint48 epochStartTimestamp,
+            uint48 epochEndTimestamp,
+            uint24 epochStartDrawId,
+            uint24 epochEndDrawId
+        ) = twabRewards.epochRangesForPromotion(promotionId, 0);
+        assertEq(epochStartTimestamp, firstDrawOpensAt, "start timestamp");
+        assertEq(epochEndTimestamp, firstDrawOpensAt + epochDuration, "end timestamp");
+        assertEq(epochStartDrawId, 0, "start draw id");
+        assertEq(epochEndDrawId, epochDuration / drawPeriodSeconds - 1, "end draw id");
+    }
+    
+    /* ============ epochRanges ============ */
+
+    function testEpochRanges() public {
+        (
+            uint48 epochStartTimestamp,
+            uint48 epochEndTimestamp,
+            uint24 epochStartDrawId,
+            uint24 epochEndDrawId
+        ) = twabRewards.epochRanges(firstDrawOpensAt, epochDuration, 0);
+        assertEq(epochStartTimestamp, firstDrawOpensAt, "start timestamp");
+        assertEq(epochEndTimestamp, firstDrawOpensAt + epochDuration, "end timestamp");
+        assertEq(epochStartDrawId, 0, "start draw id");
+        assertEq(epochEndDrawId, epochDuration / drawPeriodSeconds - 1, "end draw id");
+    }
+
     /* ============ getCurrentEpochId ============ */
 
     function testGetCurrentEpochId() external {

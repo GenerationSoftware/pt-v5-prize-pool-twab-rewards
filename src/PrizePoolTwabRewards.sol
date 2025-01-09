@@ -517,7 +517,16 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
         return 0;
     }
 
-    function epochRanges(
+    /**
+     * @notice Get the time and draw ranges for an epoch
+     * @param _promotionId Id of the promotion
+     * @param _epochId Id of the epoch to get the ranges for
+     * @return epochStartTimestamp Start timestamp of the epoch
+     * @return epochEndTimestamp End timestamp of the epoch
+     * @return epochStartDrawId Start draw id of the epoch
+     * @return epochEndDrawId End draw id of the epoch
+     */
+    function epochRangesForPromotion(
         uint256 _promotionId,
         uint8 _epochId
     ) public view returns (
@@ -530,6 +539,16 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
         return epochRanges(promotion.startTimestamp, promotion.epochDuration, _epochId);
     }
 
+    /**
+     * @notice Get the time and draw ranges for an epoch
+     * @param _promotionStartTimestamp Start timestamp of the promotion
+     * @param _promotionEpochDuration Duration of an epoch in the promotion
+     * @param _epochId Id of the epoch to get the ranges for
+     * @return epochStartTimestamp Start timestamp of the epoch
+     * @return epochEndTimestamp End timestamp of the epoch
+     * @return epochStartDrawId Start draw id of the epoch
+     * @return epochEndDrawId End draw id of the epoch
+     */
     function epochRanges(
         uint48 _promotionStartTimestamp,
         uint48 _promotionEpochDuration,

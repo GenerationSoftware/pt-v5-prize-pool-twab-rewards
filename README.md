@@ -1,16 +1,10 @@
-# Foundry template
+# PoolTogether V5 Prize Pool Twab Rewards
 
-Template to kickstart a Foundry project.
+[![Code Coverage](https://github.com/generationsoftware/pt-v5-prize-pool-twab-rewards/actions/workflows/coverage.yml/badge.svg)](https://github.com/generationsoftware/pt-v5-prize-pool-twab-rewards/actions/workflows/coverage.yml)
+[![built-with openzeppelin](https://img.shields.io/badge/built%20with-OpenZeppelin-3677FF)](https://docs.openzeppelin.com/)
+![MIT license](https://img.shields.io/badge/license-MIT-blue)
 
-## Getting started
-
-The easiest way to get started is by clicking the [Use this template](https://github.com/pooltogether/foundry-template/generate) button at the top right of this page.
-
-If you prefer to go the CLI way:
-
-```
-forge init my-project --template https://github.com/pooltogether/foundry-template
-```
+The Prize Pool Twab Rewards contract makes it easy to distribute incentives to all vaults that contribute to a Prize Pool.
 
 ## Development
 

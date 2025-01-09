@@ -125,8 +125,8 @@ contract PrizePoolTwabRewardsForkTest is Test {
             ,
             ,
             epochStartDrawId,
-            epochEndDrawId
-        ) = twabRewards.epochRanges(promotionId, 0);
+            epochEndDrawId  
+        ) = twabRewards.epochRangesForPromotion(promotionId, 0);
         uint256 totalContributed = prizePool.getTotalContributedBetween(epochStartDrawId, epochEndDrawId);
         // claim for vault1 + wallet1
         assertEq((500e18*1e18)/totalContributed, twabRewards.claimRewards(vault1, wallet1, promotionId, epochIds));
@@ -157,7 +157,7 @@ contract PrizePoolTwabRewardsForkTest is Test {
             ,
             epochStartDrawId,
             epochEndDrawId
-        ) = twabRewards.epochRanges(promotionId, 2);
+        ) = twabRewards.epochRangesForPromotion(promotionId, 2);
         totalContributed = prizePool.getTotalContributedBetween(epochStartDrawId, epochEndDrawId);
         assertEq((500e18*11e18)/totalContributed, twabRewards.claimRewards(vault1, wallet1, promotionId, epochIds));
 
