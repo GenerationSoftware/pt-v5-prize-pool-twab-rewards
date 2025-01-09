@@ -803,7 +803,6 @@ contract PrizePoolTwabRewardsTest is Test {
         epochIds[2] = 3;
 
         uint256 totalShares = 1000e18;
-        console.log("minted at", firstDrawOpensAt);
         vm.warp(firstDrawOpensAt);
         vm.startPrank(vaultAddress);
         twabController.mint(wallet1, uint96((totalShares * 3) / 4));
@@ -817,7 +816,6 @@ contract PrizePoolTwabRewardsTest is Test {
         uint8 numEpochsPassed = 3;
         uint256 warpTime = firstDrawOpensAt + epochDuration * 4;
         vm.warp(warpTime);
-        console.log("warpTime", warpTime);
         vm.expectEmit();
         emit RewardsClaimed(promotionId, epochIds, vaultAddress, wallet1, (numEpochsPassed * (tokensPerEpoch * 3)) / 4);
         twabRewards.claimRewards(vaultAddress, wallet1, promotionId, epochIds);

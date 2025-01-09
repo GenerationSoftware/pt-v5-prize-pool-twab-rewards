@@ -125,9 +125,9 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
      * @notice Emitted when a promotion is created.
      * @param promotionId Id of the newly created promotion
      * @param token The token that will be rewarded from the promotion
-     * @param startTimestamp The draw at which the promotion starts
+     * @param startTimestamp The timestamp at which the promotion starts
      * @param tokensPerEpoch The number of tokens emitted per epoch
-     * @param epochDuration The duration of epoch in draws
+     * @param epochDuration The duration of epoch in seconds
      * @param initialNumberOfEpochs The initial number of epochs the promotion is set to run for
      */
     event PromotionCreated(
@@ -462,9 +462,6 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
     }
 
     function calculateDrawIdAt(uint64 _timestamp) public view returns (uint24) {
-        // console.log("_timestamp", _timestamp);
-        // console.log("_firstDrawOpensAt", _firstDrawOpensAt);
-        // console.log("_drawPeriodSeconds", _drawPeriodSeconds);
         if (_timestamp < _firstDrawOpensAt) return 0;
         else return uint24((_timestamp - _firstDrawOpensAt) / _drawPeriodSeconds);
     }
@@ -487,18 +484,13 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
         uint8 _epochId
     ) internal view returns (uint256) {
         uint48 _epochDuration = _promotion.epochDuration;
-        // console.log("epoch duration", _epochDuration);
-        uint48 _epochStartTimestamp = _promotion.startTimestamp + (_epochDuration * _epochId);
-        uint48 _epochEndTimestamp = _epochStartTimestamp + _epochDuration;
 
-        uint24 _epochStartDrawId = calculateDrawIdAt(_epochStartTimestamp);
-        uint24 _epochEndDrawId = _epochStartDrawId + uint24(_epochDuration / _drawPeriodSeconds) - 1;
-
-        // console.log("epoch id", _epochId);
-        // console.log("epoch start draw id", _epochStartDrawId);
-        // console.log("epoch end draw id", _epochEndDrawId);
-        // console.log("epoch start timestamp", _epochStartTimestamp);
-        // console.log("epoch end timestamp", _epochEndTimestamp);
+        (
+            uint48 _epochStartTimestamp,
+            uint48 _epochEndTimestamp,
+            uint24 _epochStartDrawId,
+            uint24 _epochEndDrawId
+        ) = epochRanges(_promotion.startTimestamp, _epochDuration, _epochId);
 
         if (block.timestamp < _epochEndTimestamp) revert EpochNotOver(_epochEndTimestamp);
         if (_epochId >= _promotion.numberOfEpochs) revert InvalidEpochId(_epochId, _promotion.numberOfEpochs);
@@ -510,23 +502,48 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
             _epochEndTimestamp
         );
 
-        // console.log("twab _userAverage", _userAverage);
-
         if (_userAverage > 0) {
-            uint256 _averageTotalSupply = twabController.getTotalSupplyTwabBetween(
-                _vault,
-                _epochStartTimestamp,
-                _epochEndTimestamp
-            );
-            // console.log("twab _averageTotalSupply", _averageTotalSupply);
-            uint256 _totalContributed = prizePool.getTotalContributedBetween(_epochStartDrawId, _epochEndDrawId);
-            // console.log("ppc _totalContributed", _totalContributed);
             uint256 _vaultContributed = prizePool.getContributedBetween(_vault, _epochStartDrawId, _epochEndDrawId);
-            // console.log("ppc _vaultContributed", _vaultContributed);
-            return (_promotion.tokensPerEpoch * _userAverage * _vaultContributed) / (_averageTotalSupply * _totalContributed);
+            if (_vaultContributed > 0) {
+                uint256 _averageTotalSupply = twabController.getTotalSupplyTwabBetween(
+                    _vault,
+                    _epochStartTimestamp,
+                    _epochEndTimestamp
+                );
+                uint256 _totalContributed = prizePool.getTotalContributedBetween(_epochStartDrawId, _epochEndDrawId);
+                return (_promotion.tokensPerEpoch * _userAverage * _vaultContributed) / (_averageTotalSupply * _totalContributed);
+            }
         }
-
         return 0;
+    }
+
+    function epochRanges(
+        uint256 _promotionId,
+        uint8 _epochId
+    ) public view returns (
+        uint48 epochStartTimestamp,
+        uint48 epochEndTimestamp,
+        uint24 epochStartDrawId,
+        uint24 epochEndDrawId
+    ) {
+        Promotion memory promotion = _promotions[_promotionId];
+        return epochRanges(promotion.startTimestamp, promotion.epochDuration, _epochId);
+    }
+
+    function epochRanges(
+        uint48 _promotionStartTimestamp,
+        uint48 _promotionEpochDuration,
+        uint8 _epochId
+    ) public view returns (
+        uint48 epochStartTimestamp,
+        uint48 epochEndTimestamp,
+        uint24 epochStartDrawId,
+        uint24 epochEndDrawId
+    ) {
+        epochStartTimestamp = _promotionStartTimestamp + (_promotionEpochDuration * _epochId);
+        epochEndTimestamp = epochStartTimestamp + _promotionEpochDuration;
+        epochStartDrawId = calculateDrawIdAt(epochStartTimestamp);
+        epochEndDrawId = epochStartDrawId + uint24(_promotionEpochDuration / _drawPeriodSeconds) - 1;
     }
 
     /**
