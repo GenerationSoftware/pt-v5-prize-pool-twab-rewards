@@ -6,6 +6,10 @@
 
 The Prize Pool Twab Rewards contract makes it easy to distribute incentives to all vaults that contribute to a Prize Pool.
 
+## Deployments
+
+[Optimism Sepolia](https://sepolia-optimism.etherscan.io/address/0xfaad38011e648488baca09f63b4544043d209697)
+
 ## Development
 
 ### Installation
