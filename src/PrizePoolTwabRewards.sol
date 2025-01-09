@@ -6,7 +6,8 @@ import { SafeERC20 } from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.so
 import { Multicall } from "openzeppelin-contracts/utils/Multicall.sol";
 import { TwabController } from "pt-v5-twab-controller/TwabController.sol";
 
-import { ITwabRewards, Promotion } from "./interfaces/ITwabRewards.sol";
+import { IPrizePool } from "./external/IPrizePool.sol";
+import { IPrizePoolTwabRewards, Promotion } from "./interfaces/IPrizePoolTwabRewards.sol";
 
 /* ============ Custom Errors ============ */
 
@@ -15,9 +16,6 @@ error TwabControllerZeroAddress();
 
 /// @notice Thrown when a promotion is created with an emission of zero tokens per epoch.
 error ZeroTokensPerEpoch();
-
-/// @notice Thrown when a promotion is created with an epoch duration of zero.
-error ZeroEpochDuration();
 
 /// @notice Thrown when the number of epochs is zero when it must be greater than zero.
 error ZeroEpochs();
@@ -68,18 +66,20 @@ error EpochNotOver(uint64 epochEndTimestamp);
 /// @param numberOfEpochs The number of epochs in the promotion
 error InvalidEpochId(uint8 epochId, uint8 numberOfEpochs);
 
-/// @notice Thrown if an epoch duration is not a multiple of the TWAB period length.
-/// @param epochDuration The duration of the epoch in seconds
-/// @param twabPeriodLength The duration of the TWAB period in seconds
-error EpochDurationNotMultipleOfTwabPeriod(uint48 epochDuration, uint32 twabPeriodLength);
+/// @notice Thrown if the given prize pool address is zero
+error PrizePoolZeroAddress();
 
-/// @notice Thrown if a promotion start time is not aligned with the start of a TWAB period.
-/// @param startTimePeriodOffset The offset in seconds of the promotion start time from the start of the TWAB period it succeeds
-error StartTimeNotAlignedWithTwabPeriod(uint64 startTimePeriodOffset);
+error EpochDurationLtDrawPeriod();
+    
+error EpochDurationNotMultipleOfDrawPeriod();
+    
+error StartTimeLtFirstDrawOpensAt();
+    
+error StartTimeNotAlignedWithDraws();
 
 /**
- * @title PoolTogether V5 TwabRewards
- * @author PoolTogether Inc. & G9 Software Inc.
+ * @title PoolTogether V5 PrizePoolTwabRewards
+ * @author G9 Software Inc.
  * @notice Contract to distribute rewards to depositors in a PoolTogether V5 Vault.
  * This contract supports the creation of several promotions that can run simultaneously.
  * In order to calculate user rewards, we use the TWAB (Time-Weighted Average Balance) for the vault and depositor.
@@ -87,13 +87,18 @@ error StartTimeNotAlignedWithTwabPeriod(uint64 startTimePeriodOffset);
  * Rewards are calculated based on the average amount of vault tokens they hold during the epoch duration.
  * @dev This contract does not support the use of fee on transfer tokens.
  */
-contract TwabRewards is ITwabRewards, Multicall {
+contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
     using SafeERC20 for IERC20;
 
     /* ============ Global Variables ============ */
 
     /// @notice TwabController contract from which the promotions read time-weighted average balances from.
     TwabController public immutable twabController;
+
+    IPrizePool public immutable prizePool;
+
+    uint48 internal immutable _drawPeriodSeconds;
+    uint48 internal immutable _firstDrawOpensAt;
 
     /// @notice Period during which the promotion owner can't destroy a promotion.
     uint32 public constant GRACE_PERIOD = 60 days;
@@ -105,30 +110,28 @@ contract TwabRewards is ITwabRewards, Multicall {
      * @notice Latest recorded promotion id.
      * @dev Starts at 0 and is incremented by 1 for each new promotion. So the first promotion will have id 1, the second 2, etc.
      */
-    uint256 internal _latestPromotionId;
+    uint256 public latestPromotionId;
 
     /**
      * @notice Keeps track of claimed rewards per user.
      * @dev _claimedEpochs[promotionId][user] => claimedEpochs
      * @dev We pack epochs claimed by a user into a uint256. So we can't store more than 256 epochs.
      */
-    mapping(uint256 => mapping(address => uint256)) internal _claimedEpochs;
+    mapping(uint256 promotionId => mapping(address vault => mapping(address user => uint256 claimMask))) internal _claimedEpochs;
 
     /* ============ Events ============ */
 
     /**
      * @notice Emitted when a promotion is created.
      * @param promotionId Id of the newly created promotion
-     * @param vault The address of the vault that the promotion applies to
      * @param token The token that will be rewarded from the promotion
-     * @param startTimestamp The timestamp at which the promotion starts
+     * @param startTimestamp The draw at which the promotion starts
      * @param tokensPerEpoch The number of tokens emitted per epoch
-     * @param epochDuration The duration of epoch in seconds
+     * @param epochDuration The duration of epoch in draws
      * @param initialNumberOfEpochs The initial number of epochs the promotion is set to run for
      */
     event PromotionCreated(
         uint256 indexed promotionId,
-        address indexed vault,
         IERC20 indexed token,
         uint64 startTimestamp,
         uint256 tokensPerEpoch,
@@ -167,7 +170,7 @@ contract TwabRewards is ITwabRewards, Multicall {
      * @param user Address of the user for which the rewards were claimed
      * @param amount Amount of tokens transferred to the recipient address
      */
-    event RewardsClaimed(uint256 indexed promotionId, uint8[] epochIds, address indexed user, uint256 amount);
+    event RewardsClaimed(uint256 indexed promotionId, uint8[] epochIds, address indexed vault, address indexed user, uint256 amount);
 
     /* ============ Constructor ============ */
 
@@ -175,15 +178,19 @@ contract TwabRewards is ITwabRewards, Multicall {
      * @notice Constructor of the contract.
      * @param _twabController The TwabController contract to reference for vault balance and supply
      */
-    constructor(TwabController _twabController) {
+    constructor(TwabController _twabController, IPrizePool _prizePool) {
         if (address(0) == address(_twabController)) revert TwabControllerZeroAddress();
+        if (address(0) == address(_prizePool)) revert PrizePoolZeroAddress();
         twabController = _twabController;
+        prizePool = _prizePool;
+        _drawPeriodSeconds = prizePool.drawPeriodSeconds();
+        _firstDrawOpensAt = prizePool.firstDrawOpensAt();
     }
 
     /* ============ External Functions ============ */
 
     /**
-     * @inheritdoc ITwabRewards
+     * @inheritdoc IPrizePoolTwabRewards
      * @dev For sake of simplicity, `msg.sender` will be the creator of the promotion.
      * @dev `_latestPromotionId` starts at 0 and is incremented by 1 for each new promotion.
      * So the first promotion will have id 1, the second 2, etc.
@@ -191,25 +198,21 @@ contract TwabRewards is ITwabRewards, Multicall {
      * This scenario could happen if the token supplied is a fee on transfer one.
      */
     function createPromotion(
-        address _vault,
         IERC20 _token,
-        uint64 _startTimestamp,
+        uint48 _startTimestamp,
         uint256 _tokensPerEpoch,
         uint48 _epochDuration,
         uint8 _numberOfEpochs
     ) external override returns (uint256) {
         if (_tokensPerEpoch == 0) revert ZeroTokensPerEpoch();
-        if (_epochDuration == 0) revert ZeroEpochDuration();
         _requireNumberOfEpochs(_numberOfEpochs);
+        if (_epochDuration < _drawPeriodSeconds) revert EpochDurationLtDrawPeriod();
+        if (_epochDuration % _drawPeriodSeconds != 0) revert EpochDurationNotMultipleOfDrawPeriod();
+        if (_startTimestamp < _firstDrawOpensAt) revert StartTimeLtFirstDrawOpensAt();
+        if ((_startTimestamp - _firstDrawOpensAt) % _drawPeriodSeconds != 0) revert StartTimeNotAlignedWithDraws();
 
-        uint32 _twabPeriodLength = twabController.PERIOD_LENGTH();
-        if (_epochDuration % _twabPeriodLength != 0)
-            revert EpochDurationNotMultipleOfTwabPeriod(_epochDuration, _twabPeriodLength);
-        uint64 _startTimePeriodOffset = (_startTimestamp - twabController.PERIOD_OFFSET()) % _twabPeriodLength;
-        if (_startTimePeriodOffset != 0) revert StartTimeNotAlignedWithTwabPeriod(_startTimePeriodOffset);
-
-        uint256 _nextPromotionId = _latestPromotionId + 1;
-        _latestPromotionId = _nextPromotionId;
+        uint256 _nextPromotionId = latestPromotionId + 1;
+        latestPromotionId = _nextPromotionId;
 
         uint256 _amount = _tokensPerEpoch * _numberOfEpochs;
 
@@ -217,7 +220,6 @@ contract TwabRewards is ITwabRewards, Multicall {
             creator: msg.sender,
             startTimestamp: _startTimestamp,
             numberOfEpochs: _numberOfEpochs,
-            vault: _vault,
             epochDuration: _epochDuration,
             createdAt: uint48(block.timestamp),
             token: _token,
@@ -236,7 +238,6 @@ contract TwabRewards is ITwabRewards, Multicall {
 
         emit PromotionCreated(
             _nextPromotionId,
-            _vault,
             _token,
             _startTimestamp,
             _tokensPerEpoch,
@@ -247,7 +248,7 @@ contract TwabRewards is ITwabRewards, Multicall {
         return _nextPromotionId;
     }
 
-    /// @inheritdoc ITwabRewards
+    /// @inheritdoc IPrizePoolTwabRewards
     function endPromotion(uint256 _promotionId, address _to) external override returns (bool) {
         if (address(0) == _to) revert PayeeZeroAddress();
 
@@ -268,7 +269,7 @@ contract TwabRewards is ITwabRewards, Multicall {
         return true;
     }
 
-    /// @inheritdoc ITwabRewards
+    /// @inheritdoc IPrizePoolTwabRewards
     function destroyPromotion(uint256 _promotionId, address _to) external override returns (bool) {
         if (address(0) == _to) revert PayeeZeroAddress();
 
@@ -294,7 +295,7 @@ contract TwabRewards is ITwabRewards, Multicall {
         return true;
     }
 
-    /// @inheritdoc ITwabRewards
+    /// @inheritdoc IPrizePoolTwabRewards
     function extendPromotion(uint256 _promotionId, uint8 _numberOfEpochs) external override returns (bool) {
         _requireNumberOfEpochs(_numberOfEpochs);
 
@@ -318,8 +319,9 @@ contract TwabRewards is ITwabRewards, Multicall {
         return true;
     }
 
-    /// @inheritdoc ITwabRewards
+    /// @inheritdoc IPrizePoolTwabRewards
     function claimRewards(
+        address _vault,
         address _user,
         uint256 _promotionId,
         uint8[] calldata _epochIds
@@ -327,7 +329,7 @@ contract TwabRewards is ITwabRewards, Multicall {
         Promotion memory _promotion = _getPromotion(_promotionId);
 
         uint256 _rewardsAmount;
-        uint256 _userClaimedEpochs = _claimedEpochs[_promotionId][_user];
+        uint256 _userClaimedEpochs = _claimedEpochs[_promotionId][_vault][_user];
         uint256 _epochIdsLength = _epochIds.length;
 
         for (uint256 index = 0; index < _epochIdsLength; index++) {
@@ -336,38 +338,39 @@ contract TwabRewards is ITwabRewards, Multicall {
             if (_isClaimedEpoch(_userClaimedEpochs, _epochId))
                 revert RewardsAlreadyClaimed(_promotionId, _user, _epochId);
 
-            _rewardsAmount += _calculateRewardAmount(_user, _promotion, _epochId);
+            _rewardsAmount += _calculateRewardAmount(_vault, _user, _promotion, _epochId);
             _userClaimedEpochs = _updateClaimedEpoch(_userClaimedEpochs, _epochId);
         }
 
-        _claimedEpochs[_promotionId][_user] = _userClaimedEpochs;
+        _claimedEpochs[_promotionId][_vault][_user] = _userClaimedEpochs;
         _promotions[_promotionId].rewardsUnclaimed -= _rewardsAmount;
 
         _promotion.token.safeTransfer(_user, _rewardsAmount);
 
-        emit RewardsClaimed(_promotionId, _epochIds, _user, _rewardsAmount);
+        emit RewardsClaimed(_promotionId, _epochIds, _vault, _user, _rewardsAmount);
 
         return _rewardsAmount;
     }
 
-    /// @inheritdoc ITwabRewards
+    /// @inheritdoc IPrizePoolTwabRewards
     function getPromotion(uint256 _promotionId) external view override returns (Promotion memory) {
         return _getPromotion(_promotionId);
     }
 
-    /// @inheritdoc ITwabRewards
+    /// @inheritdoc IPrizePoolTwabRewards
     /// @dev Epoch ids and their boolean values are tightly packed and stored in a uint256, so epoch id starts at 0.
     function getCurrentEpochId(uint256 _promotionId) external view override returns (uint256) {
         return _getCurrentEpochId(_getPromotion(_promotionId));
     }
 
-    /// @inheritdoc ITwabRewards
+    /// @inheritdoc IPrizePoolTwabRewards
     function getRemainingRewards(uint256 _promotionId) external view override returns (uint256) {
         return _getRemainingRewards(_getPromotion(_promotionId));
     }
 
-    /// @inheritdoc ITwabRewards
+    /// @inheritdoc IPrizePoolTwabRewards
     function getRewardsAmount(
+        address _vault,
         address _user,
         uint256 _promotionId,
         uint8[] calldata _epochIds
@@ -378,10 +381,10 @@ contract TwabRewards is ITwabRewards, Multicall {
         uint256[] memory _rewardsAmount = new uint256[](_epochIdsLength);
 
         for (uint256 index = 0; index < _epochIdsLength; index++) {
-            if (_isClaimedEpoch(_claimedEpochs[_promotionId][_user], _epochIds[index])) {
+            if (_isClaimedEpoch(_claimedEpochs[_promotionId][_vault][_user], _epochIds[index])) {
                 _rewardsAmount[index] = 0;
             } else {
-                _rewardsAmount[index] = _calculateRewardAmount(_user, _promotion, _epochIds[index]);
+                _rewardsAmount[index] = _calculateRewardAmount(_vault, _user, _promotion, _epochIds[index]);
             }
         }
 
@@ -458,42 +461,69 @@ contract TwabRewards is ITwabRewards, Multicall {
         return _currentEpochId;
     }
 
+    function calculateDrawIdAt(uint64 _timestamp) public view returns (uint24) {
+        // console.log("_timestamp", _timestamp);
+        // console.log("_firstDrawOpensAt", _firstDrawOpensAt);
+        // console.log("_drawPeriodSeconds", _drawPeriodSeconds);
+        if (_timestamp < _firstDrawOpensAt) return 0;
+        else return uint24((_timestamp - _firstDrawOpensAt) / _drawPeriodSeconds);
+    }
+
     /**
      * @notice Get reward amount for a specific user.
      * @dev Rewards can only be calculated once the epoch is over.
      * @dev Will revert if `_epochId` is over the total number of epochs or if epoch is not over.
      * @dev Will return 0 if the user average balance in the vault is 0.
+     * @param _vault Vault to get reward amount for
      * @param _user User to get reward amount for
      * @param _promotion Promotion from which the epoch is
      * @param _epochId Epoch id to get reward amount for
      * @return Reward amount
      */
     function _calculateRewardAmount(
+        address _vault,
         address _user,
         Promotion memory _promotion,
         uint8 _epochId
     ) internal view returns (uint256) {
-        uint64 _epochDuration = _promotion.epochDuration;
-        uint64 _epochStartTimestamp = _promotion.startTimestamp + (_epochDuration * _epochId);
-        uint64 _epochEndTimestamp = _epochStartTimestamp + _epochDuration;
+        uint48 _epochDuration = _promotion.epochDuration;
+        // console.log("epoch duration", _epochDuration);
+        uint48 _epochStartTimestamp = _promotion.startTimestamp + (_epochDuration * _epochId);
+        uint48 _epochEndTimestamp = _epochStartTimestamp + _epochDuration;
+
+        uint24 _epochStartDrawId = calculateDrawIdAt(_epochStartTimestamp);
+        uint24 _epochEndDrawId = _epochStartDrawId + uint24(_epochDuration / _drawPeriodSeconds) - 1;
+
+        // console.log("epoch id", _epochId);
+        // console.log("epoch start draw id", _epochStartDrawId);
+        // console.log("epoch end draw id", _epochEndDrawId);
+        // console.log("epoch start timestamp", _epochStartTimestamp);
+        // console.log("epoch end timestamp", _epochEndTimestamp);
 
         if (block.timestamp < _epochEndTimestamp) revert EpochNotOver(_epochEndTimestamp);
         if (_epochId >= _promotion.numberOfEpochs) revert InvalidEpochId(_epochId, _promotion.numberOfEpochs);
 
-        uint256 _averageBalance = twabController.getTwabBetween(
-            _promotion.vault,
+        uint256 _userAverage = twabController.getTwabBetween(
+            _vault,
             _user,
             _epochStartTimestamp,
             _epochEndTimestamp
         );
 
-        if (_averageBalance > 0) {
+        // console.log("twab _userAverage", _userAverage);
+
+        if (_userAverage > 0) {
             uint256 _averageTotalSupply = twabController.getTotalSupplyTwabBetween(
-                _promotion.vault,
+                _vault,
                 _epochStartTimestamp,
                 _epochEndTimestamp
             );
-            return (_promotion.tokensPerEpoch * _averageBalance) / _averageTotalSupply;
+            // console.log("twab _averageTotalSupply", _averageTotalSupply);
+            uint256 _totalContributed = prizePool.getTotalContributedBetween(_epochStartDrawId, _epochEndDrawId);
+            // console.log("ppc _totalContributed", _totalContributed);
+            uint256 _vaultContributed = prizePool.getContributedBetween(_vault, _epochStartDrawId, _epochEndDrawId);
+            // console.log("ppc _vaultContributed", _vaultContributed);
+            return (_promotion.tokensPerEpoch * _userAverage * _vaultContributed) / (_averageTotalSupply * _totalContributed);
         }
 
         return 0;

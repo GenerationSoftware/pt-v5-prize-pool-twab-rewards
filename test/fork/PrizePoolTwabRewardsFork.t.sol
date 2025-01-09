@@ -7,11 +7,11 @@ import { IMintableERC20 } from "./utils/IMintableERC20.sol";
 import { TwabController } from "pt-v5-twab-controller/TwabController.sol";
 
 import {
-    TwabRewards,
+    IPrizePool,
+    PrizePoolTwabRewards,
     TwabControllerZeroAddress,
     TokensReceivedLessThanExpected,
     ZeroTokensPerEpoch,
-    ZeroEpochDuration,
     ZeroEpochs,
     PayeeZeroAddress,
     GracePeriodActive,
@@ -22,15 +22,16 @@ import {
     InvalidPromotion,
     EpochNotOver,
     InvalidEpochId
-} from "../../src/TwabRewards.sol";
-import { Promotion } from "../../src/interfaces/ITwabRewards.sol";
+} from "../../src/PrizePoolTwabRewards.sol";
+import { Promotion } from "../../src/interfaces/IPrizePoolTwabRewards.sol";
 
-contract TwabRewardsForkTest is Test {
+contract PrizePoolTwabRewardsForkTest is Test {
     /* ============ Fork Vars ============ */
 
     uint256 public blockNumber = 111547798;
 
     address public twabControllerAddress = address(0x499a9F249ec4c8Ea190bebbFD96f9A83bf4F6E52);
+    address public prizePoolAddress = address(0xF35fE10ffd0a9672d0095c435fd8767A7fe29B55);
 
     address public pusdce = address(0xE3B3a464ee575E8E25D2508918383b89c832f275);
     address public pweth = address(0x29Cb69D4780B53c1e5CD4D2B817142D2e9890715);
@@ -52,8 +53,9 @@ contract TwabRewardsForkTest is Test {
 
     /* ============ Variables ============ */
 
-    TwabRewards public twabRewards;
+    PrizePoolTwabRewards public twabRewards;
     TwabController public twabController;
+    IPrizePool public prizePool; 
 
     address public wallet1;
     address public wallet2;
@@ -79,7 +81,7 @@ contract TwabRewardsForkTest is Test {
         uint256 indexed promotionId,
         address indexed vault,
         IERC20 indexed token,
-        uint64 startTimestamp,
+        uint48 startTimestamp,
         uint256 tokensPerEpoch,
         uint48 epochDuration,
         uint8 initialNumberOfEpochs
@@ -98,7 +100,8 @@ contract TwabRewardsForkTest is Test {
         vm.selectFork(optimismFork);
 
         twabController = TwabController(twabControllerAddress);
-        twabRewards = new TwabRewards(twabController);
+        prizePool = IPrizePool(prizePoolAddress);
+        twabRewards = new PrizePoolTwabRewards(twabController, prizePool);
 
         wallet1 = vm.addr(uint256(keccak256("wallet1")));
         wallet2 = vm.addr(uint256(keccak256("wallet2")));
@@ -149,7 +152,7 @@ contract TwabRewardsForkTest is Test {
              * NOTE: promotion start times MUST be aligned with the twab period and offset.
              */
 
-            uint64 startTimestamp = uint64(
+            uint48 startTimestamp = uint48(
                 twabController.PERIOD_OFFSET() +
                     twabController.PERIOD_LENGTH() *
                     ((block.timestamp - twabController.PERIOD_OFFSET()) / twabController.PERIOD_LENGTH() + 1)
@@ -181,7 +184,6 @@ contract TwabRewardsForkTest is Test {
                 numberOfEpochs
             );
             uint256 pusdcePromotionId = twabRewards.createPromotion(
-                pusdce,
                 tokenTestCases[i].token,
                 startTimestamp,
                 tokenTestCases[i].tokensPerEpochPusdce,
@@ -201,7 +203,6 @@ contract TwabRewardsForkTest is Test {
                 numberOfEpochs
             );
             uint256 pwethPromotionId = twabRewards.createPromotion(
-                pweth,
                 tokenTestCases[i].token,
                 startTimestamp,
                 tokenTestCases[i].tokensPerEpochPweth,
@@ -218,7 +219,6 @@ contract TwabRewardsForkTest is Test {
                 assertEq(pusdcePromotion.creator, address(this));
                 assertEq(pusdcePromotion.startTimestamp, startTimestamp);
                 assertEq(pusdcePromotion.numberOfEpochs, numberOfEpochs);
-                assertEq(pusdcePromotion.vault, pusdce);
                 assertEq(pusdcePromotion.epochDuration, epochDuration);
                 assertEq(pusdcePromotion.createdAt, uint48(block.timestamp));
                 assertEq(address(pusdcePromotion.token), address(tokenTestCases[i].token));
@@ -228,7 +228,6 @@ contract TwabRewardsForkTest is Test {
                 assertEq(pwethPromotion.creator, address(this));
                 assertEq(pwethPromotion.startTimestamp, startTimestamp);
                 assertEq(pwethPromotion.numberOfEpochs, numberOfEpochs);
-                assertEq(pwethPromotion.vault, pweth);
                 assertEq(pwethPromotion.epochDuration, epochDuration);
                 assertEq(pwethPromotion.createdAt, uint48(block.timestamp));
                 assertEq(address(pwethPromotion.token), address(tokenTestCases[i].token));
@@ -255,9 +254,9 @@ contract TwabRewardsForkTest is Test {
                 uint8[] memory zeroEpochArray = new uint8[](1);
                 zeroEpochArray[0] = 0;
                 vm.expectRevert(abi.encodeWithSelector(EpochNotOver.selector, startTimestamp + epochDuration));
-                twabRewards.getRewardsAmount(pusdceHolder, pusdcePromotionId, zeroEpochArray);
+                twabRewards.getRewardsAmount(pusdceHolder, pusdce, pusdcePromotionId, zeroEpochArray);
                 vm.expectRevert(abi.encodeWithSelector(EpochNotOver.selector, startTimestamp + epochDuration));
-                twabRewards.getRewardsAmount(pwethHolder, pwethPromotionId, zeroEpochArray);
+                twabRewards.getRewardsAmount(pwethHolder, pweth, pwethPromotionId, zeroEpochArray);
             }
 
             {
@@ -268,9 +267,9 @@ contract TwabRewardsForkTest is Test {
                 uint8[] memory zeroEpochArray = new uint8[](1);
                 zeroEpochArray[0] = 0;
                 vm.expectRevert(abi.encodeWithSelector(EpochNotOver.selector, startTimestamp + epochDuration));
-                twabRewards.claimRewards(pusdceHolder, pusdcePromotionId, zeroEpochArray);
+                twabRewards.claimRewards(pusdceHolder, pusdce, pusdcePromotionId, zeroEpochArray);
                 vm.expectRevert(abi.encodeWithSelector(EpochNotOver.selector, startTimestamp + epochDuration));
-                twabRewards.claimRewards(pwethHolder, pwethPromotionId, zeroEpochArray);
+                twabRewards.claimRewards(pwethHolder, pweth, pwethPromotionId, zeroEpochArray);
             }
 
             {
@@ -297,16 +296,18 @@ contract TwabRewardsForkTest is Test {
                 // Ensure there are no rewards available to a wallet without a balance
                 uint8[] memory zeroEpochArray = new uint8[](1);
                 zeroEpochArray[0] = 0;
-                assertEq(twabRewards.getRewardsAmount(wallet1, pusdcePromotionId, zeroEpochArray)[0], 0);
+                assertEq(twabRewards.getRewardsAmount(wallet1, pusdce, pusdcePromotionId, zeroEpochArray)[0], 0);
 
                 {
                     // Check that the balance of rewards for the pUSDC.e vault token holders is proportional to their relative TWABs
                     uint256[] memory pusdceHolderRewards = twabRewards.getRewardsAmount(
+                        pusdce,
                         pusdceHolder,
                         pusdcePromotionId,
                         zeroEpochArray
                     );
                     uint256[] memory pusdceHolder2Rewards = twabRewards.getRewardsAmount(
+                        pusdce,
                         pusdceHolder2,
                         pusdcePromotionId,
                         zeroEpochArray
@@ -341,11 +342,13 @@ contract TwabRewardsForkTest is Test {
                 {
                     // Check that the balance of rewards for the pWETH vault token holders is proportional to their relative TWABs
                     uint256[] memory pwethHolderRewards = twabRewards.getRewardsAmount(
+                        pweth,
                         pwethHolder,
                         pwethPromotionId,
                         zeroEpochArray
                     );
                     uint256[] memory pwethHolder2Rewards = twabRewards.getRewardsAmount(
+                        pweth,
                         pwethHolder2,
                         pwethPromotionId,
                         zeroEpochArray
@@ -384,11 +387,13 @@ contract TwabRewardsForkTest is Test {
                 {
                     // Get pUSDC.e reward amounts
                     uint256[] memory pusdceHolderRewards = twabRewards.getRewardsAmount(
+                        pusdce,
                         pusdceHolder,
                         pusdcePromotionId,
                         epochIds
                     );
                     uint256[] memory pusdceHolder2Rewards = twabRewards.getRewardsAmount(
+                        pusdce,
                         pusdceHolder2,
                         pusdcePromotionId,
                         epochIds
@@ -420,11 +425,13 @@ contract TwabRewardsForkTest is Test {
                 {
                     // Get pWETH reward amounts
                     uint256[] memory pwethHolderRewards = twabRewards.getRewardsAmount(
+                        pweth,
                         pwethHolder,
                         pwethPromotionId,
                         epochIds
                     );
                     uint256[] memory pwethHolder2Rewards = twabRewards.getRewardsAmount(
+                        pweth,
                         pwethHolder2,
                         pwethPromotionId,
                         epochIds
@@ -451,7 +458,7 @@ contract TwabRewardsForkTest is Test {
                 epochIds[1] = 1;
                 epochIds[2] = 2;
 
-                uint256[] memory rewards = twabRewards.getRewardsAmount(pusdceHolder2, pusdcePromotionId, epochIds);
+                uint256[] memory rewards = twabRewards.getRewardsAmount(pusdceHolder2, pusdce, pusdcePromotionId, epochIds);
                 assertLt(rewards[2], rewards[1]);
                 assertEq(rewards[2], 0);
 
@@ -476,11 +483,12 @@ contract TwabRewardsForkTest is Test {
                 );
 
                 uint256[] memory pusdceRewards = twabRewards.getRewardsAmount(
+                    pusdce,
                     pusdceHolder,
                     pusdcePromotionId,
                     epochIds
                 );
-                uint256[] memory pwethRewards = twabRewards.getRewardsAmount(pwethHolder, pwethPromotionId, epochIds);
+                uint256[] memory pwethRewards = twabRewards.getRewardsAmount(pweth, pwethHolder, pwethPromotionId, epochIds);
 
                 uint256 totalExpectedRewards = pusdceRewards[0] +
                     pusdceRewards[1] +
@@ -544,11 +552,12 @@ contract TwabRewardsForkTest is Test {
                 );
 
                 uint256[] memory pusdceRewards = twabRewards.getRewardsAmount(
+                    pusdce,
                     pusdceHolder2,
                     pusdcePromotionId,
                     epochIds
                 );
-                uint256[] memory pwethRewards = twabRewards.getRewardsAmount(pwethHolder2, pwethPromotionId, epochIds);
+                uint256[] memory pwethRewards = twabRewards.getRewardsAmount(pweth, pwethHolder2, pwethPromotionId, epochIds);
 
                 uint256 totalPusdceRewards = 0;
                 uint256 totalPwethRewards = 0;
@@ -605,7 +614,7 @@ contract TwabRewardsForkTest is Test {
                 epochIds[2] = 5;
 
                 vm.expectRevert(abi.encodeWithSelector(InvalidPromotion.selector, pusdcePromotionId));
-                twabRewards.claimRewards(pusdceHolder, pusdcePromotionId, epochIds);
+                twabRewards.claimRewards(pusdceHolder, pusdce, pusdcePromotionId, epochIds);
             }
         }
     }
