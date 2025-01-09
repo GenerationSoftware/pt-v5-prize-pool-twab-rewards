@@ -69,22 +69,26 @@ error InvalidEpochId(uint8 epochId, uint8 numberOfEpochs);
 /// @notice Thrown if the given prize pool address is zero
 error PrizePoolZeroAddress();
 
+/// @notice Thrown when the epoch duration is less than the draw period.
 error EpochDurationLtDrawPeriod();
     
+/// @notice Thrown when the epoch duration is not a multiple of the draw period.
 error EpochDurationNotMultipleOfDrawPeriod();
     
+/// @notice Thrown when the start time is less than the first draw opens at time.
 error StartTimeLtFirstDrawOpensAt();
     
+/// @notice Thrown when the start time is not aligned with the draws.
 error StartTimeNotAlignedWithDraws();
 
 /**
  * @title PoolTogether V5 PrizePoolTwabRewards
  * @author G9 Software Inc.
- * @notice Contract to distribute rewards to depositors in a PoolTogether V5 Vault.
- * This contract supports the creation of several promotions that can run simultaneously.
- * In order to calculate user rewards, we use the TWAB (Time-Weighted Average Balance) for the vault and depositor.
- * This way, users simply need to hold their vault tokens to be eligible to claim rewards.
- * Rewards are calculated based on the average amount of vault tokens they hold during the epoch duration.
+ * @notice Contract to distribute rewards to depositors across all vaults that contribute to a Prize Pool.
+ * The contract supports multiple reward "promotions". Each promotion can define a different reward token,
+ * start time, epoch duration, and number of epochs. Promotions divide time into evenly sized epochs; and users 
+ * can claim rewards for each epoch. The amount each user gets is based on their portion of the Vault twab * vault contribution,
+ * where the vault contribution is fraction of prize pool prizes that the vault contributed during the epoch.
  * @dev This contract does not support the use of fee on transfer tokens.
  */
 contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
@@ -95,6 +99,7 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
     /// @notice TwabController contract from which the promotions read time-weighted average balances from.
     TwabController public immutable twabController;
 
+    /// @notice The Prize Pool used to compute the vault contributions.
     IPrizePool public immutable prizePool;
 
     uint48 internal immutable _drawPeriodSeconds;
@@ -177,6 +182,7 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
     /**
      * @notice Constructor of the contract.
      * @param _twabController The TwabController contract to reference for vault balance and supply
+     * @param _prizePool The PrizePool contract to use for prize contributions
      */
     constructor(TwabController _twabController, IPrizePool _prizePool) {
         if (address(0) == address(_twabController)) revert TwabControllerZeroAddress();
