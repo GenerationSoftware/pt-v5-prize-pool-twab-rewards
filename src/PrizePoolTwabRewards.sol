@@ -105,6 +105,8 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
     uint48 internal immutable _drawPeriodSeconds;
     uint48 internal immutable _firstDrawOpensAt;
 
+    address constant SPONSORSHIP_ADDRESS = address(1);
+
     /// @notice Period during which the promotion owner can't destroy a promotion.
     uint32 public constant GRACE_PERIOD = 60 days;
 
@@ -216,6 +218,11 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
         if (_epochDuration % _drawPeriodSeconds != 0) revert EpochDurationNotMultipleOfDrawPeriod();
         if (_startTimestamp < _firstDrawOpensAt) revert StartTimeLtFirstDrawOpensAt();
         if ((_startTimestamp - _firstDrawOpensAt) % _drawPeriodSeconds != 0) revert StartTimeNotAlignedWithDraws();
+
+        // ensure that this contract isn't eligible to win any prizes
+        if (twabController.delegateOf(address(_token), address(this)) != SPONSORSHIP_ADDRESS) {
+            twabController.delegate(address(_token), SPONSORSHIP_ADDRESS);
+        }
 
         uint256 _nextPromotionId = latestPromotionId + 1;
         latestPromotionId = _nextPromotionId;

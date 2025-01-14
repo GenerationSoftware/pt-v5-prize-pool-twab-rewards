@@ -78,6 +78,7 @@ contract PrizePoolTwabRewardsTest is Test {
         firstDrawOpensAt = uint48(block.timestamp);
         twabController = new TwabController(twabPeriodLength, uint32(firstDrawOpensAt));
         prizePool = IPrizePool(makeAddr("prizePool"));
+        vm.etch(address(prizePool), "prizePool");
         vm.mockCall(address(prizePool), abi.encodeWithSelector(prizePool.drawPeriodSeconds.selector), abi.encode(drawPeriodSeconds));
         vm.mockCall(address(prizePool), abi.encodeWithSelector(prizePool.firstDrawOpensAt.selector), abi.encode(firstDrawOpensAt));
         mockToken = new ERC20Mock();
@@ -1051,6 +1052,7 @@ contract PrizePoolTwabRewardsTest is Test {
         uint256 amount = tokensPerEpoch * numberOfEpochs;
         mockToken.mint(address(this), amount);
         mockToken.approve(address(twabRewards), amount);
+        mockDelegateCheck(false);
         return
             twabRewards.createPromotion(
                 mockToken,
@@ -1059,6 +1061,11 @@ contract PrizePoolTwabRewardsTest is Test {
                 epochDuration,
                 numberOfEpochs
             );
+    }
+
+    function mockDelegateCheck(bool alreadyDelegated) public {
+        vm.mockCall(address(twabController), abi.encodeWithSelector(twabController.delegateOf.selector, address(mockToken), address(twabRewards)), abi.encode(address(alreadyDelegated ? address(1) : address(0))));
+        vm.mockCall(address(twabController), abi.encodeWithSelector(twabController.delegate.selector, address(mockToken), address(1)), abi.encode());
     }
 
     function mockPrizePoolContributions(address _vault, uint24 _startDrawId, uint24 _endDrawId, uint192 _vaultAmount, uint192 _totalAmount) public {
