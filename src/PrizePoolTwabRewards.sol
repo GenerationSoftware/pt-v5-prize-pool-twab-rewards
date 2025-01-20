@@ -662,13 +662,4 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
     function _isClaimedEpoch(uint256 _userClaimedEpochs, uint8 _epochId) internal pure returns (bool) {
         return (_userClaimedEpochs >> _epochId) & uint256(1) == 1;
     }
-
-
-    function burnGas(uint amount) public {
-        uint startingGas = gasleft();
-        uint count = 0;
-        while ((startingGas - gasleft()) < amount) {
-            count++;
-        }
-    }
 }
