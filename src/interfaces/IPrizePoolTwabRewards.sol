@@ -125,5 +125,5 @@ interface IPrizePoolTwabRewards {
         address user,
         uint256 promotionId,
         uint8[] calldata epochIds
-    ) external view returns (uint256[] memory);
+    ) external returns (uint256[] memory);
 }

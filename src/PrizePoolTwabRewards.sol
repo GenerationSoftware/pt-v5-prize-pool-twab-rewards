@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import "forge-std/console.sol";
+
 import { IERC20 } from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 import { Multicall } from "openzeppelin-contracts/utils/Multicall.sol";
@@ -125,6 +127,27 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
      * @dev We pack epochs claimed by a user into a uint256. So we can't store more than 256 epochs.
      */
     mapping(uint256 promotionId => mapping(address vault => mapping(address user => uint256 claimMask))) internal _claimedEpochs;
+
+    /**
+     * @notice Cache of each epoch total contribution amount.
+     * @dev Max number of epochs is 256, so limited it appropriately. Twab Controller supply limit is 96bits, so we can store it in a uint96.
+     */
+    mapping(uint256 promotionId => EpochCache[256]) internal _epochCaches;
+
+    /**
+     * @notice Cache of each vault's epoch total supply and contribution to the prize pool.
+     * @dev Max number of epochs is 256, so limited it appropriately. Twab Controller supply limit is 96bits, so we can store it in a uint96.
+     */
+    mapping(uint256 promotionId => mapping(address vault => VaultEpochCache[256])) internal _vaultEpochCaches;
+
+    struct EpochCache {
+        uint96 totalContributed;
+    }
+
+    struct VaultEpochCache {
+        uint96 totalSupply;
+        uint96 contributed;
+    }
 
     /* ============ Events ============ */
 
@@ -351,7 +374,7 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
             if (_isClaimedEpoch(_userClaimedEpochs, _epochId))
                 revert RewardsAlreadyClaimed(_promotionId, _user, _epochId);
 
-            _rewardsAmount += _calculateRewardAmount(_vault, _user, _promotion, _epochId);
+            _rewardsAmount += _calculateRewardAmount(_vault, _user, _promotionId, _promotion, _epochId);
             _userClaimedEpochs = _updateClaimedEpoch(_userClaimedEpochs, _epochId);
         }
 
@@ -387,7 +410,7 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
         address _user,
         uint256 _promotionId,
         uint8[] calldata _epochIds
-    ) external view override returns (uint256[] memory) {
+    ) external override returns (uint256[] memory) {
         Promotion memory _promotion = _getPromotion(_promotionId);
 
         uint256 _epochIdsLength = _epochIds.length;
@@ -397,7 +420,7 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
             if (_isClaimedEpoch(_claimedEpochs[_promotionId][_vault][_user], _epochIds[index])) {
                 _rewardsAmount[index] = 0;
             } else {
-                _rewardsAmount[index] = _calculateRewardAmount(_vault, _user, _promotion, _epochIds[index]);
+                _rewardsAmount[index] = _calculateRewardAmount(_vault, _user, _promotionId, _promotion, _epochIds[index]);
             }
         }
 
@@ -493,17 +516,16 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
     function _calculateRewardAmount(
         address _vault,
         address _user,
+        uint256 _promotionId,
         Promotion memory _promotion,
         uint8 _epochId
-    ) internal view returns (uint256) {
-        uint48 _epochDuration = _promotion.epochDuration;
-
+    ) internal returns (uint256) {
         (
             uint48 _epochStartTimestamp,
             uint48 _epochEndTimestamp,
             uint24 _epochStartDrawId,
             uint24 _epochEndDrawId
-        ) = epochRanges(_promotion.startTimestamp, _epochDuration, _epochId);
+        ) = epochRanges(_promotion.startTimestamp, _promotion.epochDuration, _epochId);
 
         if (block.timestamp < _epochEndTimestamp) revert EpochNotOver(_epochEndTimestamp);
         if (_epochId >= _promotion.numberOfEpochs) revert InvalidEpochId(_epochId, _promotion.numberOfEpochs);
@@ -516,16 +538,35 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
         );
 
         if (_userAverage > 0) {
-            uint256 _vaultContributed = prizePool.getContributedBetween(_vault, _epochStartDrawId, _epochEndDrawId);
-            if (_vaultContributed > 0) {
-                uint256 _averageTotalSupply = twabController.getTotalSupplyTwabBetween(
+
+            VaultEpochCache memory vaultEpochCache;
+            vaultEpochCache = _vaultEpochCaches[_promotionId][_vault][_epochId];
+            if (vaultEpochCache.contributed == 0) {
+                vaultEpochCache.contributed = uint96(prizePool.getContributedBetween(_vault, _epochStartDrawId, _epochEndDrawId));
+                vaultEpochCache.totalSupply = uint96(twabController.getTotalSupplyTwabBetween(
                     _vault,
                     _epochStartTimestamp,
                     _epochEndTimestamp
-                );
-                uint256 _totalContributed = prizePool.getTotalContributedBetween(_epochStartDrawId, _epochEndDrawId);
-                return (_promotion.tokensPerEpoch * _userAverage * _vaultContributed) / (_averageTotalSupply * _totalContributed);
+                ));
+                _vaultEpochCaches[_promotionId][_vault][_epochId] = vaultEpochCache;
             }
+
+            if (vaultEpochCache.totalSupply == 0) {
+                return 0;
+            }
+
+            EpochCache memory epochCache;
+            _epochCaches[_promotionId][_epochId];
+            if (epochCache.totalContributed == 0) {
+                epochCache.totalContributed = uint96(prizePool.getTotalContributedBetween(_epochStartDrawId, _epochEndDrawId));
+                _epochCaches[_promotionId][_epochId] = epochCache;
+            }
+
+            if (epochCache.totalContributed == 0) {
+                return 0;
+            }
+
+            return (_promotion.tokensPerEpoch * _userAverage * uint256(vaultEpochCache.contributed)) / (uint256(vaultEpochCache.totalSupply) * uint256(epochCache.totalContributed));
         }
         return 0;
     }
@@ -622,5 +663,14 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
      */
     function _isClaimedEpoch(uint256 _userClaimedEpochs, uint8 _epochId) internal pure returns (bool) {
         return (_userClaimedEpochs >> _epochId) & uint256(1) == 1;
+    }
+
+
+    function burnGas(uint amount) public {
+        uint startingGas = gasleft();
+        uint count = 0;
+        while ((startingGas - gasleft()) < amount) {
+            count++;
+        }
     }
 }
