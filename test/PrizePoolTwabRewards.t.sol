@@ -99,6 +99,7 @@ contract PrizePoolTwabRewardsTest is Test {
         mockPrizePoolContributions(vaultAddress, 21, 27, 1e18, 1e18);
         mockPrizePoolContributions(vaultAddress, 28, 34, 1e18, 1e18);
         mockPrizePoolContributions(vaultAddress, 35, 41, 1e18, 1e18);
+        mockPrizePoolContributions(vaultAddress, 42, 48, 1e18, 1e18);
 
     }
 
@@ -854,57 +855,157 @@ contract PrizePoolTwabRewardsTest is Test {
         assertEq(mockToken.balanceOf(wallet1), (numEpochsPassed * (tokensPerEpoch * 3)) / 4);
     }
 
-    function testClaimRewards_Multicall() external {
-        uint8 numEpochsPassed = 3;
+    function testClaimRewards_noUsers() public {
+        uint8[] memory epochIds = new uint8[](3);
+        epochIds[0] = 1;
+        epochIds[1] = 2;
+        epochIds[2] = 3;
+        uint256 warpTime = firstDrawOpensAt + epochDuration * 4;
+        vm.warp(warpTime);
+        assertEq(twabRewards.claimRewards(vaultAddress, wallet1, promotionId, epochIds), 0);
+    }
+
+    function testClaimRewards_noContributions() public {
         uint8[] memory epochIds = new uint8[](3);
         epochIds[0] = 0;
         epochIds[1] = 1;
         epochIds[2] = 2;
-
+        mockPrizePoolContributions(vaultAddress, 0, 6, 0, 0);
+        mockPrizePoolContributions(vaultAddress, 7, 13, 0, 0);
+        mockPrizePoolContributions(vaultAddress, 14, 20, 0, 0);
         uint256 totalShares = 1000e18;
         vm.warp(firstDrawOpensAt);
         vm.startPrank(vaultAddress);
         twabController.mint(wallet1, uint96((totalShares * 3) / 4));
         twabController.mint(wallet2, uint96((totalShares * 1) / 4));
         vm.stopPrank();
-        address secondVaultAddress = makeAddr("vault2");
-        vm.startPrank(secondVaultAddress);
-        twabController.mint(wallet1, 1e18);
+        uint256 warpTime = firstDrawOpensAt + epochDuration * 4;
+        vm.warp(warpTime);
+        assertEq(twabRewards.claimRewards(vaultAddress, wallet1, promotionId, epochIds), 0);
+    }
+
+    function testClaimRewards_Multicall() external {
+        uint8 numEpochsPassed = 6;
+        uint8[] memory epochIds = new uint8[](6);
+        epochIds[0] = 0;
+        epochIds[1] = 1;
+        epochIds[2] = 2;
+        epochIds[3] = 3;
+        epochIds[4] = 4;
+        epochIds[5] = 5;
+
+        uint256 totalShares = 1000e18;
+        vm.warp(firstDrawOpensAt);
+        vm.startPrank(vaultAddress);
+        twabController.mint(wallet1, uint96(totalShares / 2));
+        twabController.mint(wallet2, uint96(totalShares / 2));
         vm.stopPrank();
-
-        mockPrizePoolContributions(vaultAddress, 0, 6, 1e18, 1e18);
-        mockPrizePoolContributions(vaultAddress, 7, 13, 1e18, 1e18);
-        mockPrizePoolContributions(vaultAddress, 14, 20, 1e18, 1e18);
-
-        mockPrizePoolContributions(secondVaultAddress, 0, 6, 1e18, 1e18);
-        mockPrizePoolContributions(secondVaultAddress, 7, 13, 1e18, 1e18);
-        mockPrizePoolContributions(secondVaultAddress, 14, 20, 1e18, 1e18);
 
         // Create second promotion with a different vault
         uint256 amount = tokensPerEpoch * numberOfEpochs;
         mockToken.mint(address(this), amount);
         mockToken.approve(address(twabRewards), amount);
-        uint256 secondPromotionId = twabRewards.createPromotion(
-            mockToken,
-            firstDrawOpensAt,
-            tokensPerEpoch,
-            epochDuration,
-            numberOfEpochs
-        );
 
         bytes[] memory data = new bytes[](2);
         data[0] = abi.encodeWithSelector(twabRewards.claimRewards.selector, vaultAddress, wallet1, promotionId, epochIds);
-        data[1] = abi.encodeWithSelector(twabRewards.claimRewards.selector, secondVaultAddress, wallet1, secondPromotionId, epochIds);
+        data[1] = abi.encodeWithSelector(twabRewards.claimRewards.selector, vaultAddress, wallet2, promotionId, epochIds);
 
         vm.warp(firstDrawOpensAt + epochDuration * numEpochsPassed);
         vm.expectEmit();
-        uint rewardAmount1 = (numEpochsPassed * (tokensPerEpoch * 3)) / 4;
-        emit RewardsClaimed(promotionId, epochIds, vaultAddress, wallet1, rewardAmount1);
+        uint totalPromotionRewards = numEpochsPassed * tokensPerEpoch;
+        uint vaultPromotionRewards = totalPromotionRewards;
+        uint promotion1Rewards = vaultPromotionRewards / 2;
+        emit RewardsClaimed(promotionId, epochIds, vaultAddress, wallet1, promotion1Rewards);
         vm.expectEmit();
-        emit RewardsClaimed(secondPromotionId, epochIds, secondVaultAddress, wallet1, tokensPerEpoch * 3);
+        emit RewardsClaimed(promotionId, epochIds, vaultAddress, wallet2, promotion1Rewards);
         twabRewards.multicall(data);
 
-        assertEq(mockToken.balanceOf(wallet1), tokensPerEpoch * 3 + (numEpochsPassed * (tokensPerEpoch * 3)) / 4);
+        assertEq(mockToken.balanceOf(wallet1), promotion1Rewards);
+        assertEq(mockToken.balanceOf(wallet2), promotion1Rewards);
+    }
+
+    /// test different scenarios for gas usage
+    function testClaimRewards_gasProfile_cold() public {
+        uint8[] memory epochIds = setupGasProfiling();
+
+        // First claim; cold storage
+        assertEq(twabRewards.claimRewards(vaultAddress, wallet1, promotionId, epochIds), tokensPerEpoch / 2);
+    }
+
+    /// test different scenarios for gas usage
+    function testClaimRewards_gasProfile_multipleEpochs_cold() public {
+        setupGasProfiling();
+        uint8[] memory epochIds = new uint8[](3);
+        epochIds[0] = 0;
+        epochIds[1] = 1;
+        epochIds[2] = 2;
+
+        assertEq(twabRewards.claimRewards(vaultAddress, wallet1, promotionId, epochIds), (tokensPerEpoch / 2) * 3);
+    }
+
+    /// test different scenarios for gas usage
+    function testClaimRewards_gasProfile_multipleEpochs_hot() public {
+        setupGasProfiling();
+        uint8[] memory epochIds = new uint8[](1);
+        epochIds[0] = 0;
+        // epochIds[1] = 1;
+        // epochIds[2] = 2;
+
+        assertEq(twabRewards.claimRewards(vaultAddress, wallet1, promotionId, epochIds), (tokensPerEpoch / 2) * epochIds.length);
+        assertEq(twabRewards.claimRewards(vaultAddress, wallet2, promotionId, epochIds), (tokensPerEpoch / 2) * epochIds.length);
+    }
+
+    function testClaimRewards_gasProfile_secondClaim() public {
+        uint8[] memory epochIds = setupGasProfiling();
+
+        // First claim; cold storage
+        assertEq(twabRewards.claimRewards(vaultAddress, wallet1, promotionId, epochIds), tokensPerEpoch / 2);
+
+        // Second claim
+        epochIds[0] = 1;
+        assertEq(twabRewards.claimRewards(vaultAddress, wallet1, promotionId, epochIds), tokensPerEpoch / 2);
+    }
+
+    function testClaimRewards_gasProfile_claimSecondUser() public {
+        uint8[] memory epochIds = setupGasProfiling();
+
+        // First claim; cold storage
+        assertEq(twabRewards.claimRewards(vaultAddress, wallet1, promotionId, epochIds), tokensPerEpoch / 2);
+
+        // Second claim
+        epochIds[0] = 1;
+        assertEq(twabRewards.claimRewards(vaultAddress, wallet1, promotionId, epochIds), tokensPerEpoch / 2);
+
+        // Second claim
+        epochIds[0] = 2;
+        assertEq(twabRewards.claimRewards(vaultAddress, wallet1, promotionId, epochIds), tokensPerEpoch / 2);
+
+        // claim on older epoch with new user
+        epochIds[0] = 0;
+        assertEq(twabRewards.claimRewards(vaultAddress, wallet2, promotionId, epochIds), tokensPerEpoch / 2);
+    }
+
+    function testClaimRewards_gasProfile_secondClaimSecondUser() public {
+        uint8[] memory epochIds = setupGasProfiling();
+
+        // First claim; cold storage
+        assertEq(twabRewards.claimRewards(vaultAddress, wallet1, promotionId, epochIds), tokensPerEpoch / 2);
+
+        // Second claim
+        epochIds[0] = 1;
+        assertEq(twabRewards.claimRewards(vaultAddress, wallet1, promotionId, epochIds), tokensPerEpoch / 2);
+
+        // Second claim
+        epochIds[0] = 2;
+        assertEq(twabRewards.claimRewards(vaultAddress, wallet1, promotionId, epochIds), tokensPerEpoch / 2);
+
+        // claim on older epoch with new user
+        epochIds[0] = 0;
+        assertEq(twabRewards.claimRewards(vaultAddress, wallet2, promotionId, epochIds), tokensPerEpoch / 2);
+
+        // second old epoch claim
+        epochIds[0] = 1;
+        assertEq(twabRewards.claimRewards(vaultAddress, wallet2, promotionId, epochIds), tokensPerEpoch / 2);
     }
 
     function testClaimRewards_DecreasedDelegateBalance() external {
@@ -1071,5 +1172,21 @@ contract PrizePoolTwabRewardsTest is Test {
     function mockPrizePoolContributions(address _vault, uint24 _startDrawId, uint24 _endDrawId, uint192 _vaultAmount, uint192 _totalAmount) public {
         vm.mockCall(address(prizePool), abi.encodeWithSelector(prizePool.getTotalContributedBetween.selector, _startDrawId, _endDrawId), abi.encode(_totalAmount));
         vm.mockCall(address(prizePool), abi.encodeWithSelector(prizePool.getContributedBetween.selector, _vault, _startDrawId, _endDrawId), abi.encode(_vaultAmount));
+    }
+
+    function setupGasProfiling() public returns (uint8[] memory) {
+        uint8[] memory epochIds = new uint8[](1);
+        epochIds[0] = 0;
+
+        vm.warp(firstDrawOpensAt);
+        vm.startPrank(vaultAddress);
+        twabController.mint(wallet1, 1e18);
+        twabController.mint(wallet2, 1e18);
+        vm.stopPrank();
+
+        // warp far enough ahead
+        vm.warp(firstDrawOpensAt + epochDuration*6);
+
+        return epochIds;
     }
 }

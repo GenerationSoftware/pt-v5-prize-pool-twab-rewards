@@ -5,7 +5,7 @@ test = 'test'
 libs = ['lib']
 solc = "0.8.24"
 fs_permissions = [{ access = "read", path = "./broadcast" }]
-gas_reports = ["Foo"]
+gas_reports = ["PrizePoolTwabRewards"]
 
 [rpc_endpoints]
 mainnet = "${MAINNET_RPC_URL}"
