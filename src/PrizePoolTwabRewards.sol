@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import { IERC20 } from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
+import { SafeCast } from "openzeppelin-contracts/utils/math/SafeCast.sol";
 import { Multicall } from "openzeppelin-contracts/utils/Multicall.sol";
 import { TwabController } from "pt-v5-twab-controller/TwabController.sol";
 
@@ -93,6 +94,7 @@ error StartTimeNotAlignedWithDraws();
  */
 contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
     using SafeERC20 for IERC20;
+    using SafeCast for uint256;
 
     /* ============ Global Variables ============ */
 
@@ -128,7 +130,7 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
 
     /**
      * @notice Cache of each epoch total contribution amount.
-     * @dev Max number of epochs is 256, so limited it appropriately. Twab Controller supply limit is 96bits, so we can store it in a uint96.
+     * @dev Max number of epochs is 256, so limited it appropriately. Prize Pool draw contributions are stored as uint160, but 128 bits should give us plenty of overhead.
      */
     mapping(uint256 promotionId => EpochCache[256]) internal _epochCaches;
 
@@ -139,12 +141,12 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
     mapping(uint256 promotionId => mapping(address vault => VaultEpochCache[256])) internal _vaultEpochCaches;
 
     struct EpochCache {
-        uint96 totalContributed;
+        uint128 totalContributed;
     }
 
     struct VaultEpochCache {
-        uint96 totalSupply;
-        uint96 contributed;
+        uint128 totalSupply;
+        uint128 contributed;
     }
 
     /* ============ Events ============ */
@@ -425,6 +427,64 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
         return _rewardsAmount;
     }
 
+    /**
+     * @notice Calculate the draw id at a specific timestamp.
+     * @param _timestamp Timestamp to calculate the draw id at
+     * @return Draw id
+     */
+    function calculateDrawIdAt(uint64 _timestamp) public view returns (uint24) {
+        if (_timestamp < _firstDrawOpensAt) return 0;
+        else return uint24((_timestamp - _firstDrawOpensAt) / _drawPeriodSeconds);
+    }
+
+    /**
+     * @notice Get the time and draw ranges for an epoch
+     * @param _promotionId Id of the promotion
+     * @param _epochId Id of the epoch to get the ranges for
+     * @return epochStartTimestamp Start timestamp of the epoch
+     * @return epochEndTimestamp End timestamp of the epoch
+     * @return epochStartDrawId Start draw id of the epoch
+     * @return epochEndDrawId End draw id of the epoch
+     */
+    function epochRangesForPromotion(
+        uint256 _promotionId,
+        uint8 _epochId
+    ) public view returns (
+        uint48 epochStartTimestamp,
+        uint48 epochEndTimestamp,
+        uint24 epochStartDrawId,
+        uint24 epochEndDrawId
+    ) {
+        Promotion memory promotion = _promotions[_promotionId];
+        return epochRanges(promotion.startTimestamp, promotion.epochDuration, _epochId);
+    }
+
+    /**
+     * @notice Get the time and draw ranges for an epoch
+     * @param _promotionStartTimestamp Start timestamp of the promotion
+     * @param _promotionEpochDuration Duration of an epoch in the promotion
+     * @param _epochId Id of the epoch to get the ranges for
+     * @return epochStartTimestamp Start timestamp of the epoch
+     * @return epochEndTimestamp End timestamp of the epoch
+     * @return epochStartDrawId Start draw id of the epoch
+     * @return epochEndDrawId End draw id of the epoch
+     */
+    function epochRanges(
+        uint48 _promotionStartTimestamp,
+        uint48 _promotionEpochDuration,
+        uint8 _epochId
+    ) public view returns (
+        uint48 epochStartTimestamp,
+        uint48 epochEndTimestamp,
+        uint24 epochStartDrawId,
+        uint24 epochEndDrawId
+    ) {
+        epochStartTimestamp = _promotionStartTimestamp + (_promotionEpochDuration * _epochId);
+        epochEndTimestamp = epochStartTimestamp + _promotionEpochDuration;
+        epochStartDrawId = calculateDrawIdAt(epochStartTimestamp);
+        epochEndDrawId = epochStartDrawId + uint24(_promotionEpochDuration / _drawPeriodSeconds) - 1;
+    }
+
     /* ============ Internal Functions ============ */
 
     /**
@@ -495,11 +555,6 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
         return _currentEpochId;
     }
 
-    function calculateDrawIdAt(uint64 _timestamp) public view returns (uint24) {
-        if (_timestamp < _firstDrawOpensAt) return 0;
-        else return uint24((_timestamp - _firstDrawOpensAt) / _drawPeriodSeconds);
-    }
-
     /**
      * @notice Get reward amount for a specific user.
      * @dev Rewards can only be calculated once the epoch is over.
@@ -540,8 +595,8 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
             VaultEpochCache memory vaultEpochCache;
             vaultEpochCache = _vaultEpochCaches[_promotionId][_vault][_epochId];
             if (vaultEpochCache.contributed == 0) {
-                vaultEpochCache.contributed = uint96(prizePool.getContributedBetween(_vault, _epochStartDrawId, _epochEndDrawId));
-                vaultEpochCache.totalSupply = uint96(twabController.getTotalSupplyTwabBetween(
+                vaultEpochCache.contributed = SafeCast.toUint128(prizePool.getContributedBetween(_vault, _epochStartDrawId, _epochEndDrawId));
+                vaultEpochCache.totalSupply = SafeCast.toUint128(twabController.getTotalSupplyTwabBetween(
                     _vault,
                     _epochStartTimestamp,
                     _epochEndTimestamp
@@ -556,7 +611,7 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
             EpochCache memory epochCache;
             _epochCaches[_promotionId][_epochId];
             if (epochCache.totalContributed == 0) {
-                epochCache.totalContributed = uint96(prizePool.getTotalContributedBetween(_epochStartDrawId, _epochEndDrawId));
+                epochCache.totalContributed = SafeCast.toUint128(prizePool.getTotalContributedBetween(_epochStartDrawId, _epochEndDrawId));
                 _epochCaches[_promotionId][_epochId] = epochCache;
             }
 
@@ -567,54 +622,6 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
             return (_promotion.tokensPerEpoch * _userAverage * uint256(vaultEpochCache.contributed)) / (uint256(vaultEpochCache.totalSupply) * uint256(epochCache.totalContributed));
         }
         return 0;
-    }
-
-    /**
-     * @notice Get the time and draw ranges for an epoch
-     * @param _promotionId Id of the promotion
-     * @param _epochId Id of the epoch to get the ranges for
-     * @return epochStartTimestamp Start timestamp of the epoch
-     * @return epochEndTimestamp End timestamp of the epoch
-     * @return epochStartDrawId Start draw id of the epoch
-     * @return epochEndDrawId End draw id of the epoch
-     */
-    function epochRangesForPromotion(
-        uint256 _promotionId,
-        uint8 _epochId
-    ) public view returns (
-        uint48 epochStartTimestamp,
-        uint48 epochEndTimestamp,
-        uint24 epochStartDrawId,
-        uint24 epochEndDrawId
-    ) {
-        Promotion memory promotion = _promotions[_promotionId];
-        return epochRanges(promotion.startTimestamp, promotion.epochDuration, _epochId);
-    }
-
-    /**
-     * @notice Get the time and draw ranges for an epoch
-     * @param _promotionStartTimestamp Start timestamp of the promotion
-     * @param _promotionEpochDuration Duration of an epoch in the promotion
-     * @param _epochId Id of the epoch to get the ranges for
-     * @return epochStartTimestamp Start timestamp of the epoch
-     * @return epochEndTimestamp End timestamp of the epoch
-     * @return epochStartDrawId Start draw id of the epoch
-     * @return epochEndDrawId End draw id of the epoch
-     */
-    function epochRanges(
-        uint48 _promotionStartTimestamp,
-        uint48 _promotionEpochDuration,
-        uint8 _epochId
-    ) public view returns (
-        uint48 epochStartTimestamp,
-        uint48 epochEndTimestamp,
-        uint24 epochStartDrawId,
-        uint24 epochEndDrawId
-    ) {
-        epochStartTimestamp = _promotionStartTimestamp + (_promotionEpochDuration * _epochId);
-        epochEndTimestamp = epochStartTimestamp + _promotionEpochDuration;
-        epochStartDrawId = calculateDrawIdAt(epochStartTimestamp);
-        epochEndDrawId = epochStartDrawId + uint24(_promotionEpochDuration / _drawPeriodSeconds) - 1;
     }
 
     /**
