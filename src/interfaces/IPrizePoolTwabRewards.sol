@@ -16,13 +16,16 @@ import { IERC20 } from "openzeppelin-contracts/token/ERC20/IERC20.sol";
  */
 struct Promotion {
     address creator;
-    uint48 startTimestamp;
-    uint8 numberOfEpochs;
-    IERC20 token;
     uint48 epochDuration;
     uint48 createdAt;
-    uint256 tokensPerEpoch;
-    uint256 rewardsUnclaimed;
+    // first word ends
+    IERC20 token;
+    uint48 startTimestamp;
+    // second word ends
+    uint120 tokensPerEpoch;
+    uint8 numberOfEpochs;
+    uint128 rewardsUnclaimed;
+    // third word ends
 }
 
 /**
@@ -43,7 +46,7 @@ interface IPrizePoolTwabRewards {
     function createPromotion(
         IERC20 token,
         uint48 startTimestamp,
-        uint256 tokensPerEpoch,
+        uint120 tokensPerEpoch,
         uint48 epochDuration,
         uint8 numberOfEpochs
     ) external returns (uint256);
@@ -88,6 +91,16 @@ interface IPrizePoolTwabRewards {
     function claimRewards(address vault, address user, uint256 promotionId, uint8[] calldata epochIds) external returns (uint256);
 
     /**
+     * @notice Claim rewards for all epochs from `_startEpochId` to the most recently ended epoch.
+     * @param _vault Address of the vault
+     * @param _user Address of the user
+     * @param _promotionId Id of the promotion
+     * @param _startEpochId Id of the epoch to start claiming rewards from
+     * @return Amount of tokens transferred to the recipient address
+     */
+    function claimRewardedEpochs(address _vault, address _user, uint256 _promotionId, uint8 _startEpochId) external returns (uint256);
+
+    /**
      * @notice Get settings for a specific promotion.
      * @param promotionId Id of the promotion to get settings for
      * @return Promotion settings
@@ -99,31 +112,21 @@ interface IPrizePoolTwabRewards {
      * @param promotionId Id of the promotion to get current epoch for
      * @return Current epoch id of the promotion
      */
-    function getCurrentEpochId(uint256 promotionId) external view returns (uint256);
+    function getEpochIdNow(uint256 promotionId) external view returns (uint8);
+
+    /**
+     * @notice Get the epoch id of a promotion given a timestamp
+     * @param promotionId Id of the promotion to get current epoch for
+     * @param timestamp Timestamp to get the epoch id for
+     * @return Current epoch id of the promotion
+     */
+    function getEpochIdAt(uint256 promotionId, uint256 timestamp) external view returns (uint8);
 
     /**
      * @notice Get the total amount of tokens left to be rewarded.
      * @param promotionId Id of the promotion to get the total amount of tokens left to be rewarded for
      * @return Amount of tokens left to be rewarded
      */
-    function getRemainingRewards(uint256 promotionId) external view returns (uint256);
+    function getRemainingRewards(uint256 promotionId) external view returns (uint128);
 
-    /**
-     * @notice Get amount of tokens to be rewarded for a given epoch.
-     * @dev Rewards amount can only be retrieved for epochs that are over.
-     * @dev Will revert if `epochId` is over the total number of epochs or if epoch is not over.
-     * @dev Will return 0 if the user average balance for the promoted vault is 0.
-     * @dev Will be 0 if user has already claimed rewards for the epoch.
-     * @param vault Address of the vault to get the rewards for
-     * @param user Address of the user to get amount of rewards for
-     * @param promotionId Id of the promotion from which the epoch is
-     * @param epochIds Epoch ids to get reward amount for
-     * @return Amount of tokens per epoch to be rewarded
-     */
-    function getRewardsAmount(
-        address vault,
-        address user,
-        uint256 promotionId,
-        uint8[] calldata epochIds
-    ) external returns (uint256[] memory);
 }

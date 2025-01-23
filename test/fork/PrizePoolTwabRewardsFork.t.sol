@@ -139,10 +139,10 @@ contract PrizePoolTwabRewardsForkTest is Test {
         epochIds[0] = 1;
 
         // Assert no one received rewards
-        assertEq(0, twabRewards.getRewardsAmount(vault1, wallet1, promotionId, epochIds)[0]);
-        assertEq(0, twabRewards.getRewardsAmount(vault2, wallet1, promotionId, epochIds)[0]);
-        assertEq(0, twabRewards.getRewardsAmount(vault1, wallet2, promotionId, epochIds)[0]);
-        assertEq(0, twabRewards.getRewardsAmount(vault2, wallet2, promotionId, epochIds)[0]);
+        assertEq(0, twabRewards.claimRewards(vault1, wallet1, promotionId, epochIds));
+        assertEq(0, twabRewards.claimRewards(vault2, wallet1, promotionId, epochIds));
+        assertEq(0, twabRewards.claimRewards(vault1, wallet2, promotionId, epochIds));
+        assertEq(0, twabRewards.claimRewards(vault2, wallet2, promotionId, epochIds));
 
         // contribute only for vault1
         wethToken.transfer(address(prizePool), 11e18);
@@ -163,7 +163,7 @@ contract PrizePoolTwabRewardsForkTest is Test {
         assertEq((500e18*11e18)/totalContributed, twabRewards.claimRewards(vault1, wallet1, promotionId, epochIds));
 
         // assert vault2 is zero
-        assertEq(0, twabRewards.getRewardsAmount(vault2, wallet1, promotionId, epochIds)[0]);
-        assertEq(0, twabRewards.getRewardsAmount(vault2, wallet2, promotionId, epochIds)[0]);
+        assertEq(0, twabRewards.claimRewards(vault2, wallet1, promotionId, epochIds));
+        assertEq(0, twabRewards.claimRewards(vault2, wallet2, promotionId, epochIds));
     }
 }
