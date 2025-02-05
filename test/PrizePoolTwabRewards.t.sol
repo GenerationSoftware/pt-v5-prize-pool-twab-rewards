@@ -31,6 +31,7 @@ import {
     NoEpochsToClaim
 } from "../src/PrizePoolTwabRewards.sol";
 import { Promotion } from "../src/interfaces/IPrizePoolTwabRewards.sol";
+import { ITwabRewards } from "../src/interfaces/ITwabRewards.sol";
 
 contract PrizePoolTwabRewardsTest is Test {
     PrizePoolTwabRewards public twabRewards;
@@ -1204,6 +1205,20 @@ contract PrizePoolTwabRewardsTest is Test {
         assertEq(rewards[2], tokensPerEpoch / 4);
     }
 
+    /* ============ claimTwabRewards ============ */
+
+    function testClaimTwabRewards() public {
+        ITwabRewards regularTwabRewards = ITwabRewards(makeAddr("TwabRewards"));
+        vm.etch(address(regularTwabRewards), "twabRewards");
+
+        uint8[] memory epochIds = new uint8[](1);
+        epochIds[0] = 12;
+        vm.mockCall(address(regularTwabRewards), abi.encodeWithSelector(regularTwabRewards.claimRewards.selector, wallet1, 3, epochIds), abi.encode(111));
+        assertEq(twabRewards.claimTwabRewards(regularTwabRewards, wallet1, 3, epochIds), 111);
+    }
+
+    /* ============ Utilities ============ */
+
     function testEpochIdArrayToBytes() public {
         uint8[] memory epochIds = new uint8[](3);
         epochIds[0] = 2;
@@ -1222,7 +1237,7 @@ contract PrizePoolTwabRewardsTest is Test {
         assertEq(epochIds[2], 4);
     }
 
-    /* ============ Helpers ============ */
+    /* ============ Test Helpers ============ */
 
     function createPromotion() public returns (uint256) {
         uint256 amount = uint256(tokensPerEpoch) * numberOfEpochs;

@@ -28,7 +28,7 @@ struct Promotion {
 }
 
 /**
- * @title  PoolTogether V5 ITwabRewards
+ * @title  PoolTogether V5 IPrizePoolTwabRewards
  * @author PoolTogether Inc. & G9 Software Inc.
  * @notice TwabRewards contract interface.
  */
