@@ -61,9 +61,9 @@ contract PrizePoolTwabRewardsTest is Test {
     event PromotionCreated(
         uint256 indexed promotionId,
         IERC20 indexed token,
-        uint48 startTimestamp,
-        uint120 tokensPerEpoch,
-        uint48 epochDuration,
+        uint40 startTimestamp,
+        uint104 tokensPerEpoch,
+        uint40 epochDuration,
         uint8 initialNumberOfEpochs
     );
     event PromotionEnded(uint256 indexed promotionId, address indexed recipient, uint256 amount, uint8 epochNumber);

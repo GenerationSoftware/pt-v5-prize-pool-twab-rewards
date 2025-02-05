@@ -165,9 +165,9 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
     event PromotionCreated(
         uint256 indexed promotionId,
         IERC20 indexed token,
-        uint48 startTimestamp,
-        uint120 tokensPerEpoch,
-        uint48 epochDuration,
+        uint40 startTimestamp,
+        uint104 tokensPerEpoch,
+        uint40 epochDuration,
         uint8 initialNumberOfEpochs
     );
 
