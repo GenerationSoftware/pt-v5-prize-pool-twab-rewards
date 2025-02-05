@@ -304,7 +304,7 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
         _promotions[_promotionId].numberOfEpochs = _epochNumber;
 
         uint112 _remainingRewards = _getRemainingRewards(_promotion);
-        _promotions[_promotionId].rewardsUnclaimed -= _remainingRewards;
+        _promotions[_promotionId].rewardsUnclaimed = _promotion.rewardsUnclaimed - _remainingRewards;
 
         _promotion.token.safeTransfer(_to, _remainingRewards);
 
@@ -541,7 +541,7 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
         Promotion memory _promotion = _getPromotion(_promotionId);
 
         console.log("gas used 2", gas - gasleft());
-        uint112 _rewardsAmount;
+        uint256 _rewardsAmount;
         bytes32 _userClaimedEpochs = claimedEpochs[_promotionId][_vault][_user];
 
         for (uint256 index = startEpochId; index < 256; ++index) {
@@ -556,7 +556,7 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
 
         claimedEpochs[_promotionId][_vault][_user] = _userClaimedEpochs;
 
-        _promotions[_promotionId].rewardsUnclaimed -= _rewardsAmount;
+        _promotions[_promotionId].rewardsUnclaimed = uint112(_promotion.rewardsUnclaimed - _rewardsAmount);
 
         _promotion.token.safeTransfer(_user, _rewardsAmount);
 
@@ -665,7 +665,7 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
         uint256 _promotionId,
         Promotion memory _promotion,
         uint8 _epochId
-    ) internal returns (uint112) {
+    ) internal returns (uint256) {
         (
             uint48 _epochStartTimestamp,
             uint48 _epochEndTimestamp,
@@ -694,7 +694,7 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
 
             uint numerator = ((_promotion.tokensPerEpoch * _userAverage) / uint256(vaultEpochCache.totalSupply)) * uint256(vaultEpochCache.contributed);
             uint denominator = (uint256(epochCache.totalContributed));
-            return SafeCast.toUint112(numerator / denominator);
+            return numerator / denominator;
         }
         return 0;
     }
