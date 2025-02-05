@@ -9,6 +9,7 @@ import { TwabController } from "pt-v5-twab-controller/TwabController.sol";
 
 import { IPrizePool } from "./external/IPrizePool.sol";
 import { IPrizePoolTwabRewards, Promotion } from "./interfaces/IPrizePoolTwabRewards.sol";
+import { ITwabRewards } from "./interfaces/ITwabRewards.sol";
 
 /* ============ Custom Errors ============ */
 
@@ -366,6 +367,20 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
     ) external override returns (uint256) {
         bytes32 _epochClaimFlags = epochIdArrayToBytes(_epochIds);
         return _claimRewards(_vault, _user, _promotionId, _epochClaimFlags, 0);
+    }
+
+    /**
+     * @notice Pass through to claim regular Twab Rewards. This is intended to allow single tx claiming by EOAs using the built-in Multicall
+     * @param _twabRewards TwabRewards contract to claim rewards from
+     * @param _user User to claim rewards for
+     * @param _promotionId Promotion to claim rewards for
+     * @param _epochIds Epoch ids to claim rewards for
+     * @return Total amount of rewards claimed
+     */
+    function claimTwabRewards(
+        ITwabRewards _twabRewards, address _user, uint256 _promotionId, uint8[] calldata _epochIds
+    ) external returns (uint256) {
+        return _twabRewards.claimRewards(_user, _promotionId, _epochIds);
     }
 
     /// @inheritdoc IPrizePoolTwabRewards
