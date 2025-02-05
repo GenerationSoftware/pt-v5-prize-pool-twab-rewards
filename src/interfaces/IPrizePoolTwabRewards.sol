@@ -45,9 +45,9 @@ interface IPrizePoolTwabRewards {
      */
     function createPromotion(
         IERC20 token,
-        uint40 startTimestamp,
-        uint96 tokensPerEpoch,
-        uint40 epochDuration,
+        uint48 startTimestamp,
+        uint120 tokensPerEpoch,
+        uint48 epochDuration,
         uint8 numberOfEpochs
     ) external returns (uint256);
 

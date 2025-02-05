@@ -22,7 +22,6 @@ import {
     RewardsAlreadyClaimed,
     PromotionInactive,
     OnlyPromotionCreator,
-    InvalidPromotion,
     EpochNotOver,
     InvalidEpochId,
     EpochDurationLtDrawPeriod,
@@ -62,9 +61,9 @@ contract PrizePoolTwabRewardsTest is Test {
     event PromotionCreated(
         uint256 indexed promotionId,
         IERC20 indexed token,
-        uint40 startTimestamp,
-        uint96 tokensPerEpoch,
-        uint40 epochDuration,
+        uint48 startTimestamp,
+        uint120 tokensPerEpoch,
+        uint48 epochDuration,
         uint8 initialNumberOfEpochs
     );
     event PromotionEnded(uint256 indexed promotionId, address indexed recipient, uint256 amount, uint8 epochNumber);
@@ -121,7 +120,7 @@ contract PrizePoolTwabRewardsTest is Test {
 
     /* ============ createPromotion ============ */
 
-    function testCreatePromotion() external {
+    function testCreatePromotion_success() external {
         vm.startPrank(wallet1);
 
         uint256 amount = tokensPerEpoch * numberOfEpochs;
@@ -477,11 +476,6 @@ contract PrizePoolTwabRewardsTest is Test {
         twabRewards.extendPromotion(promotionId, 5);
     }
 
-    function testExtendPromotion_InvalidPromotion() external {
-        vm.expectRevert(abi.encodeWithSelector(InvalidPromotion.selector, promotionId + 1));
-        twabRewards.extendPromotion(promotionId + 1, 1);
-    }
-
     function testExtendPromotion_ExceedsMaxEpochs() external {
         vm.expectRevert(abi.encodeWithSelector(ExceedsMaxEpochs.selector, 250, numberOfEpochs, 255));
         twabRewards.extendPromotion(promotionId, 250);
@@ -520,11 +514,6 @@ contract PrizePoolTwabRewardsTest is Test {
         assertEq(address(p.token), address(mockToken));
         assertEq(p.tokensPerEpoch, tokensPerEpoch);
         assertEq(p.rewardsUnclaimed, tokensPerEpoch * numberOfEpochs);
-    }
-
-    function testGetPromotion_InvalidPromotion() external {
-        vm.expectRevert(abi.encodeWithSelector(InvalidPromotion.selector, promotionId + 1));
-        twabRewards.getPromotion(promotionId + 1);
     }
 
     /* ============ getRemainingRewards ============ */
@@ -591,11 +580,6 @@ contract PrizePoolTwabRewardsTest is Test {
     function testGetEpochIdNow_pastEpochLimit() external {
         vm.warp(firstDrawOpensAt + epochDuration * 300);
         assertEq(twabRewards.getEpochIdNow(promotionId), type(uint8).max);
-    }
-
-    function testGetEpochIdNow_InvalidPromotion() external {
-        vm.expectRevert(abi.encodeWithSelector(InvalidPromotion.selector, promotionId + 1));
-        twabRewards.getEpochIdNow(promotionId + 1);
     }
 
     /* ============ getEpochIdAt ============ */
@@ -757,19 +741,6 @@ contract PrizePoolTwabRewardsTest is Test {
 
         vm.expectRevert(abi.encodeWithSelector(InvalidEpochId.selector, numberOfEpochs, numberOfEpochs));
         twabRewards.claimRewards(wallet1, vaultAddress, promotionId, epochIds);
-    }
-
-    function testGetRewardsAmount_InvalidPromotion() external {
-        uint8 numEpochsPassed = 3;
-        uint8[] memory epochIds = new uint8[](3);
-        epochIds[0] = 0;
-        epochIds[1] = 1;
-        epochIds[2] = 2;
-
-        vm.warp(firstDrawOpensAt + epochDuration * numEpochsPassed);
-
-        vm.expectRevert(abi.encodeWithSelector(InvalidPromotion.selector, promotionId + 1));
-        twabRewards.claimRewards(wallet1, vaultAddress, promotionId + 1, epochIds);
     }
 
     /* ============ claimRewards ============ */
@@ -1020,18 +991,6 @@ contract PrizePoolTwabRewardsTest is Test {
         twabRewards.claimRewards(vaultAddress, wallet1, promotionId, epochIds);
 
         assertEq(mockToken.balanceOf(wallet1), 0);
-    }
-
-    function testClaimRewards_InvalidPromotion() external {
-        uint8 numEpochsPassed = 3;
-        uint8[] memory epochIds = new uint8[](3);
-        epochIds[0] = 0;
-        epochIds[1] = 1;
-        epochIds[2] = 2;
-
-        vm.warp(firstDrawOpensAt + epochDuration * numEpochsPassed);
-        vm.expectRevert(abi.encodeWithSelector(InvalidPromotion.selector, promotionId + 1));
-        twabRewards.claimRewards(vaultAddress, wallet1, promotionId + 1, epochIds);
     }
 
     function testClaimRewards_EpochNotOver() external {

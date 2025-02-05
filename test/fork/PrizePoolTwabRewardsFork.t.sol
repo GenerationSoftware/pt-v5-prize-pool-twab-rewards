@@ -20,7 +20,6 @@ import {
     RewardsAlreadyClaimed,
     PromotionInactive,
     OnlyPromotionCreator,
-    InvalidPromotion,
     EpochNotOver,
     InvalidEpochId
 } from "../../src/PrizePoolTwabRewards.sol";
@@ -149,9 +148,12 @@ contract PrizePoolTwabRewardsForkTest is Test {
         prizePool.contributePrizeTokens(vault1, 11e18);
 
         // Go to end of promotion epoch 2
-        vm.warp(startTimestamp + epochDuration * 3);
+        vm.warp(startTimestamp + epochDuration * 4);
         epochIds[0] = 2;
 
+        uint8[] memory epochIds2 = new uint8[](2);
+        epochIds2[0] = 2;
+        epochIds2[1] = 3;
         // claim for vault1
         (
             ,
@@ -160,7 +162,7 @@ contract PrizePoolTwabRewardsForkTest is Test {
             epochEndDrawId
         ) = twabRewards.epochRangesForPromotion(promotionId, 2);
         totalContributed = prizePool.getTotalContributedBetween(epochStartDrawId, epochEndDrawId);
-        assertEq((500e18*11e18)/totalContributed, twabRewards.claimRewards(vault1, wallet1, promotionId, epochIds));
+        assertEq((500e18*11e18)/totalContributed, twabRewards.claimRewards(vault1, wallet1, promotionId, epochIds2));
 
         // assert vault2 is zero
         assertEq(0, twabRewards.claimRewards(vault2, wallet1, promotionId, epochIds));
