@@ -8,7 +8,9 @@ The Prize Pool Twab Rewards contract makes it easy to distribute incentives to a
 
 ## Deployments
 
-[Optimism Sepolia](https://sepolia-optimism.etherscan.io/address/0xf4F9876E5FbE8780612424C4f73B060AE4392C72)
+[Optimism Sepolia](https://sepolia-optimism.etherscan.io/address/0x7092D49975B262d1d0e92E858c98998620f9A71A)
+
+[Tx of Promotion 1](https://sepolia-optimism.etherscan.io/tx/0x320e477ea231a5cbebbe5fb722cfd2d26f49d5cdda930cd48196a899b3356379)
 
 ## Development
 
