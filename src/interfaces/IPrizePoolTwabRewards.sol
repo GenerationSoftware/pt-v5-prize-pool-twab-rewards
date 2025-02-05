@@ -15,17 +15,15 @@ import { IERC20 } from "openzeppelin-contracts/token/ERC20/IERC20.sol";
  * @param rewardsUnclaimed Amount of rewards that have not been claimed yet
  */
 struct Promotion {
-    address creator;
-    uint48 epochDuration;
-    uint48 createdAt;
-    // first word ends
     IERC20 token;
-    uint48 startTimestamp;
-    // second word ends
-    uint120 tokensPerEpoch;
+    uint40 epochDuration;
+    uint40 createdAt;
     uint8 numberOfEpochs;
-    uint128 rewardsUnclaimed;
-    // third word ends
+    // first word ends
+    uint40 startTimestamp;
+    uint104 tokensPerEpoch;
+    uint112 rewardsUnclaimed;
+    // second word ends
 }
 
 /**
@@ -45,9 +43,9 @@ interface IPrizePoolTwabRewards {
      */
     function createPromotion(
         IERC20 token,
-        uint48 startTimestamp,
-        uint120 tokensPerEpoch,
-        uint48 epochDuration,
+        uint40 startTimestamp,
+        uint96 tokensPerEpoch,
+        uint40 epochDuration,
         uint8 numberOfEpochs
     ) external returns (uint256);
 
@@ -127,6 +125,6 @@ interface IPrizePoolTwabRewards {
      * @param promotionId Id of the promotion to get the total amount of tokens left to be rewarded for
      * @return Amount of tokens left to be rewarded
      */
-    function getRemainingRewards(uint256 promotionId) external view returns (uint128);
+    function getRemainingRewards(uint256 promotionId) external view returns (uint112);
 
 }

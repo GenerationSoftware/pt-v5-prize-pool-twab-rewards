@@ -39,8 +39,8 @@ contract PrizePoolTwabRewardsTest is Test {
     IPrizePool public prizePool;
     ERC20Mock public mockToken;
 
-    uint48 public drawPeriodSeconds = 1 days;
-    uint48 public firstDrawOpensAt;
+    uint40 public drawPeriodSeconds = 1 days;
+    uint40 public firstDrawOpensAt;
 
     address wallet1;
     address wallet2;
@@ -50,8 +50,8 @@ contract PrizePoolTwabRewardsTest is Test {
 
     uint32 twabPeriodLength = 1 hours;
 
-    uint120 tokensPerEpoch = 10000e18;
-    uint48 epochDuration = drawPeriodSeconds * 7; // 1 week
+    uint96 tokensPerEpoch = 10000e18;
+    uint40 epochDuration = drawPeriodSeconds * 7; // 1 week
     uint8 numberOfEpochs = 12;
 
     uint256 promotionId;
@@ -62,9 +62,9 @@ contract PrizePoolTwabRewardsTest is Test {
     event PromotionCreated(
         uint256 indexed promotionId,
         IERC20 indexed token,
-        uint64 startTimestamp,
-        uint256 tokensPerEpoch,
-        uint48 epochDuration,
+        uint40 startTimestamp,
+        uint96 tokensPerEpoch,
+        uint40 epochDuration,
         uint8 initialNumberOfEpochs
     );
     event PromotionEnded(uint256 indexed promotionId, address indexed recipient, uint256 amount, uint8 epochNumber);
@@ -75,7 +75,7 @@ contract PrizePoolTwabRewardsTest is Test {
     /* ============ Set Up ============ */
 
     function setUp() public {
-        firstDrawOpensAt = uint48(block.timestamp);
+        firstDrawOpensAt = uint40(block.timestamp);
         twabController = new TwabController(twabPeriodLength, uint32(firstDrawOpensAt));
         prizePool = IPrizePool(makeAddr("prizePool"));
         vm.etch(address(prizePool), "prizePool");
@@ -187,7 +187,7 @@ contract PrizePoolTwabRewardsTest is Test {
     }
 
     function testCreatePromotion_ZeroTokensPerEpoch() external {
-        uint120 _tokensPerEpoch = 0;
+        uint96 _tokensPerEpoch = 0;
         uint256 amount = _tokensPerEpoch * numberOfEpochs;
         mockToken.mint(address(this), amount);
         mockToken.approve(address(twabRewards), amount);
@@ -404,7 +404,7 @@ contract PrizePoolTwabRewardsTest is Test {
 
     function testDestroyPromotion_DoesNotExceedRewardBalance() external {
         // create another promotion
-        uint120 _tokensPerEpoch = 1e18;
+        uint96 _tokensPerEpoch = 1e18;
         uint256 amount = _tokensPerEpoch * numberOfEpochs;
         mockToken.mint(address(this), amount);
         mockToken.approve(address(twabRewards), amount);
@@ -487,11 +487,32 @@ contract PrizePoolTwabRewardsTest is Test {
         twabRewards.extendPromotion(promotionId, 250);
     }
 
+    /* ============ getVaultRewardAmount ============ */
+
+    function testGetVaultRewardAmount_zero_contributed() public {
+        vm.warp(firstDrawOpensAt + epochDuration);
+        mockPrizePoolContributions(vaultAddress, 0, 6, 0, 1e18);
+        assertEq(twabRewards.getVaultRewardAmount(vaultAddress, promotionId, 0), 0);
+    }
+
+    function testGetVaultRewardAmount_success() public {
+        vm.warp(firstDrawOpensAt + epochDuration);
+        mockPrizePoolContributions(vaultAddress, 0, 6, 0.5e18, 1e18);
+        assertEq(twabRewards.getVaultRewardAmount(vaultAddress, promotionId, 0), tokensPerEpoch / 2);
+    }
+
+    function testGetVaultRewardAmount_second() public {
+        vm.warp(firstDrawOpensAt + epochDuration);
+        mockPrizePoolContributions(vaultAddress, 0, 6, 0.5e18, 1e18);
+        assertEq(twabRewards.getVaultRewardAmount(vaultAddress, promotionId, 0), tokensPerEpoch / 2);
+        assertEq(twabRewards.getVaultRewardAmount(vaultAddress, promotionId, 0), tokensPerEpoch / 2);
+    }
+
     /* ============ getPromotion ============ */
 
     function testGetPromotion() external {
         Promotion memory p = twabRewards.getPromotion(promotionId);
-        assertEq(p.creator, address(this));
+        // assertEq(p.creator, address(this));
         assertEq(p.startTimestamp, firstDrawOpensAt);
         assertEq(p.numberOfEpochs, numberOfEpochs);
         assertEq(p.epochDuration, epochDuration);
@@ -1164,7 +1185,7 @@ contract PrizePoolTwabRewardsTest is Test {
 
     function testClaimRewardedEpochs_maxTwabAndContributionValues_maxTokensPerEpoch() public {
         // max out tokens per epoch
-        tokensPerEpoch = type(uint120).max;
+        tokensPerEpoch = type(uint96).max;
         uint promotionId2 = createPromotion();
 
         // max out the twab controller

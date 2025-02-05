@@ -81,8 +81,8 @@ contract PrizePoolTwabRewardsForkTest is Test {
     }
 
     function test() public {
-        uint48 startTimestamp = uint48(prizePool.firstDrawOpensAt() + (currentDrawId + 1) * prizePool.drawPeriodSeconds());
-        uint48 epochDuration = uint48(prizePool.drawPeriodSeconds() * 7); // 7 draws
+        uint40 startTimestamp = uint40(prizePool.firstDrawOpensAt() + (currentDrawId + 1) * prizePool.drawPeriodSeconds());
+        uint40 epochDuration = uint40(prizePool.drawPeriodSeconds() * 7); // 7 draws
 
         vm.prank(opMinter);
         opToken.mint(address(this), 1000e18 * 10);
