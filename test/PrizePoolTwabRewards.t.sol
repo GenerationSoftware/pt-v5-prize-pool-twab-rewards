@@ -1204,6 +1204,24 @@ contract PrizePoolTwabRewardsTest is Test {
         assertEq(rewards[2], tokensPerEpoch / 4);
     }
 
+    function testEpochIdArrayToBytes() public {
+        uint8[] memory epochIds = new uint8[](3);
+        epochIds[0] = 2;
+        epochIds[1] = 4;
+        epochIds[2] = 0;
+        // 10101 = 1 + 4 + 16 = 21
+        assertEq(twabRewards.epochIdArrayToBytes(epochIds), bytes32(uint(21)));
+    }
+
+    function testEpochBytesToIdArray() public {
+        // 10101 = 1 + 4 + 16 = 21
+        uint8[] memory epochIds = twabRewards.epochBytesToIdArray(bytes32(uint(21)));
+        assertEq(epochIds.length, 3);
+        assertEq(epochIds[0], 0);
+        assertEq(epochIds[1], 2);
+        assertEq(epochIds[2], 4);
+    }
+
     /* ============ Helpers ============ */
 
     function createPromotion() public returns (uint256) {

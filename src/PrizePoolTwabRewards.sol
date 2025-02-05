@@ -533,6 +533,28 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
         return _epochClaimFlags;
     }
 
+    /**
+     * @notice Converts a bytes32 to an array of epoch ids
+     * @param _epochClaimFlags Word where each bit represents an epoch
+     * @return Array of epoch ids
+     */
+    function epochBytesToIdArray(bytes32 _epochClaimFlags) public pure returns (uint8[] memory) {
+        uint8 count;
+        for (uint256 epoch = 0; epoch < 256; ++epoch) {
+            if (_isClaimedEpoch(_epochClaimFlags, uint8(epoch))) {
+                ++count;
+            }
+        }
+        uint8[] memory _epochIds = new uint8[](count);
+        uint8 idsIndex = 0;
+        for (uint256 epoch = 0; epoch < 256; ++epoch) {
+            if (_isClaimedEpoch(_epochClaimFlags, uint8(epoch))) {
+                _epochIds[idsIndex++] = uint8(epoch);
+            }
+        }
+        return _epochIds;
+    }
+
     /* ============ Internal Functions ============ */
 
     /**
@@ -564,7 +586,6 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
             _rewardsAmount += _calculateRewardAmount(_vault, _user, _promotionId, _promotion, uint8(index));
             _userClaimedEpochs = _updateClaimedEpoch(_userClaimedEpochs, uint8(index));
         }
-
 
         claimedEpochs[_promotionId][_vault][_user] = _userClaimedEpochs;
 
