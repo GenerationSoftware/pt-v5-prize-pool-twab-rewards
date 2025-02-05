@@ -1178,6 +1178,32 @@ contract PrizePoolTwabRewardsTest is Test {
         twabRewards.claimRewardedEpochs(vaultAddress, wallet1, promotionId, 2);
     }
 
+    /* ============ claimRewardedEpochs ============ */
+
+    function testCalculateRewards_success() public {
+        uint256 totalShares = 1000e18;
+        vm.warp(firstDrawOpensAt);
+        vm.startPrank(vaultAddress);
+        twabController.mint(wallet1, uint96(totalShares / 2));
+        vm.stopPrank();
+
+        mockPrizePoolContributions(vaultAddress, 0, 6, 1e18, 1e18);
+        mockPrizePoolContributions(vaultAddress, 7, 13, 0.5e18, 1e18);
+        mockPrizePoolContributions(vaultAddress, 14, 20, 0.25e18, 1e18);
+
+        vm.warp(firstDrawOpensAt + epochDuration * 3);
+
+        uint8[] memory epochIds = new uint8[](3);
+        epochIds[0] = 0;
+        epochIds[1] = 1;
+        epochIds[2] = 2;
+
+        uint256[] memory rewards = twabRewards.calculateRewards(vaultAddress, wallet1, promotionId, epochIds);
+        assertEq(rewards[0], tokensPerEpoch);
+        assertEq(rewards[1], tokensPerEpoch / 2);
+        assertEq(rewards[2], tokensPerEpoch / 4);
+    }
+
     /* ============ Helpers ============ */
 
     function createPromotion() public returns (uint256) {

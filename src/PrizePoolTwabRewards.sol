@@ -388,6 +388,27 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
     }
 
     /**
+     * @notice Calculate rewards for a given vault, user, promotion and epoch ids.
+     * @param _vault Vault to calculate rewards for
+     * @param _user User to calculate rewards for
+     * @param _promotionId Promotion to calculate rewards for
+     * @param _epochIds Epoch ids to calculate rewards for
+     * @return rewards Array of reward amounts for each epoch
+     */
+    function calculateRewards(
+        address _vault,
+        address _user,
+        uint256 _promotionId,
+        uint8[] calldata _epochIds
+    ) external returns (uint256[] memory rewards) {
+        rewards = new uint256[](_epochIds.length);
+        Promotion memory promotion = _getPromotion(_promotionId);
+        for (uint256 index = 0; index < _epochIds.length; ++index) {
+            rewards[index] = _calculateRewardAmount(_vault, _user, _promotionId, promotion, _epochIds[index]);
+        }
+    }
+
+    /**
      * @notice Get reward amount for a given vault
      * @dev Rewards can only be calculated once the epoch is over.
      * @dev Will revert if `_epochId` is not in the past.
