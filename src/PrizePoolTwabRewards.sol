@@ -120,8 +120,8 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
     /// @notice Settings of each promotion.
     mapping(uint256 => Promotion) internal _promotions;
 
-    /// @notice Owner of each promotion
-    mapping(uint256 => address) public promotionOwners;
+    // /// @notice Owner of each promotion
+    // mapping(uint256 => address) public promotionOwners;
 
     /**
      * @notice Latest recorded promotion id.
@@ -260,8 +260,9 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
 
         uint112 _amount = uint112(_tokensPerEpoch) * uint112(_numberOfEpochs);
 
-        promotionOwners[_nextPromotionId] = msg.sender;
+        // promotionOwners[_nextPromotionId] = msg.sender;
         _promotions[_nextPromotionId] = Promotion({
+            creator: msg.sender,
             startTimestamp: _startTimestamp,
             numberOfEpochs: _numberOfEpochs,
             epochDuration: _epochDuration,
@@ -303,7 +304,7 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
         uint8 _epochNumber = _getEpochIdNow(_promotion.startTimestamp, _promotion.epochDuration);
         _promotions[_promotionId].numberOfEpochs = _epochNumber;
 
-        uint112 _remainingRewards = _getRemainingRewards(_promotion);
+        uint128 _remainingRewards = _getRemainingRewards(_promotion);
         _promotions[_promotionId].rewardsUnclaimed = _promotion.rewardsUnclaimed - _remainingRewards;
 
         _promotion.token.safeTransfer(_to, _remainingRewards);
@@ -443,7 +444,7 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
     }
 
     /// @inheritdoc IPrizePoolTwabRewards
-    function getRemainingRewards(uint256 _promotionId) external view override returns (uint112) {
+    function getRemainingRewards(uint256 _promotionId) external view override returns (uint128) {
         return _getRemainingRewards(_getPromotion(_promotionId));
     }
 
@@ -536,11 +537,8 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
         bytes32 _epochClaimFlags,
         uint8 startEpochId
     ) internal returns (uint256) {
-        uint gas = gasleft();
-        console.log("gas used 1", gas - gasleft());
         Promotion memory _promotion = _getPromotion(_promotionId);
 
-        console.log("gas used 2", gas - gasleft());
         uint256 _rewardsAmount;
         bytes32 _userClaimedEpochs = claimedEpochs[_promotionId][_vault][_user];
 
@@ -586,7 +584,7 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
      * @param _promotionId Promotion id to check
      */
     function _requirePromotionCreator(uint256 _promotionId) internal view {
-        address owner = promotionOwners[_promotionId];
+        address owner = _promotions[_promotionId].creator; // promotionOwners[_promotionId];
         if (msg.sender != owner) revert OnlyPromotionCreator(msg.sender, owner);
     }
 
@@ -597,11 +595,7 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
      * @return Promotion settings
      */
     function _getPromotion(uint256 _promotionId) internal view returns (Promotion memory) {
-        uint gas = gasleft();
-        console.log("_getPromotion gas now", gas - gasleft());
         Promotion memory _promotion = _promotions[_promotionId];
-        console.log("_getPromotion gas now 2", gas - gasleft());
-        // if (address(0) == _promotion.creator) revert InvalidPromotion(_promotionId);
         return _promotion;
     }
 
@@ -738,7 +732,7 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
      * @param _promotion Promotion to get the total amount of tokens left to be rewarded for
      * @return Amount of tokens left to be rewarded
      */
-    function _getRemainingRewards(Promotion memory _promotion) internal view returns (uint112) {
+    function _getRemainingRewards(Promotion memory _promotion) internal view returns (uint128) {
         if (block.timestamp >= _getPromotionEndTimestamp(_promotion)) {
             return 0;
         }
