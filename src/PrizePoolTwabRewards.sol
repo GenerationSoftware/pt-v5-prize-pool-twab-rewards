@@ -114,6 +114,9 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
     /// @notice Settings of each promotion.
     mapping(uint256 => Promotion) internal _promotions;
 
+    /// @notice Creator of each promotion
+    mapping(uint256 => address) public promotionCreators;
+
     /**
      * @notice Latest recorded promotion id.
      * @dev Starts at 0 and is incremented by 1 for each new promotion. So the first promotion will have id 1, the second 2, etc.
@@ -229,9 +232,9 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
      */
     function createPromotion(
         IERC20 _token,
-        uint48 _startTimestamp,
-        uint120 _tokensPerEpoch,
-        uint48 _epochDuration,
+        uint40 _startTimestamp,
+        uint104 _tokensPerEpoch,
+        uint40 _epochDuration,
         uint8 _numberOfEpochs
     ) external override returns (uint256) {
         if (_tokensPerEpoch == 0) revert ZeroTokensPerEpoch();
@@ -249,14 +252,14 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
         uint256 _nextPromotionId = latestPromotionId + 1;
         latestPromotionId = _nextPromotionId;
 
-        uint128 unclaimedRewards = SafeCast.toUint128(uint(_tokensPerEpoch) * uint(_numberOfEpochs));
+        uint112 unclaimedRewards = SafeCast.toUint112(uint(_tokensPerEpoch) * uint(_numberOfEpochs));
 
+        promotionCreators[_nextPromotionId] = msg.sender;
         _promotions[_nextPromotionId] = Promotion({
-            creator: msg.sender,
             startTimestamp: _startTimestamp,
             numberOfEpochs: _numberOfEpochs,
             epochDuration: _epochDuration,
-            createdAt: SafeCast.toUint48(block.timestamp),
+            createdAt: SafeCast.toUint40(block.timestamp),
             token: _token,
             tokensPerEpoch: _tokensPerEpoch,
             rewardsUnclaimed: unclaimedRewards
@@ -288,13 +291,13 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
         if (address(0) == _to) revert PayeeZeroAddress();
 
         Promotion memory _promotion = _getPromotion(_promotionId);
-        _requirePromotionCreator(_promotion.creator);
+        _requirePromotionCreator(promotionCreators[_promotionId]);
         _requirePromotionActive(_promotionId, _promotion);
 
         uint8 _epochNumber = _getEpochIdNow(_promotion.startTimestamp, _promotion.epochDuration);
         _promotions[_promotionId].numberOfEpochs = _epochNumber;
 
-        uint128 _remainingRewards = _getRemainingRewards(_promotion);
+        uint112 _remainingRewards = _getRemainingRewards(_promotion);
         _promotions[_promotionId].rewardsUnclaimed = _promotion.rewardsUnclaimed - _remainingRewards;
 
         _promotion.token.safeTransfer(_to, _remainingRewards);
@@ -309,7 +312,7 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
         if (address(0) == _to) revert PayeeZeroAddress();
 
         Promotion memory _promotion = _getPromotion(_promotionId);
-        _requirePromotionCreator(_promotion.creator);
+        _requirePromotionCreator(promotionCreators[_promotionId]);
 
         uint256 _promotionEndTimestamp = _getPromotionEndTimestamp(_promotion);
         uint256 _promotionCreatedAt = _promotion.createdAt;
@@ -344,9 +347,9 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
 
         _promotions[_promotionId].numberOfEpochs = _currentNumberOfEpochs + _numberOfEpochs;
 
-        uint128 _amount = SafeCast.toUint128(uint(_numberOfEpochs) * uint(_promotion.tokensPerEpoch));
+        uint112 _amount = SafeCast.toUint112(uint(_numberOfEpochs) * uint(_promotion.tokensPerEpoch));
 
-        _promotions[_promotionId].rewardsUnclaimed += _amount;
+        _promotions[_promotionId].rewardsUnclaimed = _promotion.rewardsUnclaimed + _amount;
         _promotion.token.safeTransferFrom(msg.sender, address(this), _amount);
 
         emit PromotionExtended(_promotionId, _numberOfEpochs);
@@ -527,11 +530,9 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
         bytes32 _epochClaimFlags,
         uint8 startEpochId
     ) internal returns (uint256) {
-        Promotion memory _promotion = _getPromotion(_promotionId);
-
+        Promotion memory _promotion = _promotions[_promotionId];
         uint256 _rewardsAmount;
         bytes32 _userClaimedEpochs = claimedEpochs[_promotionId][_vault][_user];
-
 
         for (uint256 index = startEpochId; index < 256; ++index) {
             if (!_isClaimedEpoch(_epochClaimFlags, uint8(index))) {
@@ -546,7 +547,7 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
 
         claimedEpochs[_promotionId][_vault][_user] = _userClaimedEpochs;
 
-        _promotions[_promotionId].rewardsUnclaimed = SafeCast.toUint128(uint(_promotion.rewardsUnclaimed) - uint(_rewardsAmount));
+        _promotions[_promotionId].rewardsUnclaimed = SafeCast.toUint112(uint(_promotion.rewardsUnclaimed) - uint(_rewardsAmount));
 
         _promotion.token.safeTransfer(_user, _rewardsAmount);
 
@@ -651,19 +652,14 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
         Promotion memory _promotion,
         uint8 _epochId
     ) internal returns (uint256) {
-
         (
             uint48 _epochStartTimestamp,
             uint48 _epochEndTimestamp,
             uint24 _epochStartDrawId,
             uint24 _epochEndDrawId
         ) = epochRanges(_promotion.startTimestamp, _promotion.epochDuration, _epochId);
-
-
         if (block.timestamp < _epochEndTimestamp) revert EpochNotOver(_epochEndTimestamp);
         if (_epochId >= _promotion.numberOfEpochs) revert InvalidEpochId(_epochId, _promotion.numberOfEpochs);
-
-
         uint256 _userAverage = twabController.getTwabBetween(
             _vault,
             _user,
@@ -696,7 +692,7 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
      * @param _epochEndTimestamp End timestamp of the epoch
      * @param _epochStartDrawId Start draw id of the epoch
      * @param _epochEndDrawId End draw id of the epoch
-     * @return VaultEpochCache struct
+     * @return vaultEpochCache VaultEpochCache struct
      */
     function _getVaultEpochCache(
         uint256 _promotionId,
@@ -725,7 +721,7 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
      * @param _epochId Epoch id
      * @param _epochStartDrawId Start draw id of the epoch
      * @param _epochEndDrawId End draw id of the epoch
-     * @return EpochCache struct
+     * @return epochCache EpochCache struct
      */
     function _getEpochCache(
         uint256 _promotionId,
@@ -745,7 +741,7 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
      * @param _promotion Promotion to get the total amount of tokens left to be rewarded for
      * @return Amount of tokens left to be rewarded
      */
-    function _getRemainingRewards(Promotion memory _promotion) internal view returns (uint128) {
+    function _getRemainingRewards(Promotion memory _promotion) internal view returns (uint112) {
         if (block.timestamp >= _getPromotionEndTimestamp(_promotion)) {
             return 0;
         }
