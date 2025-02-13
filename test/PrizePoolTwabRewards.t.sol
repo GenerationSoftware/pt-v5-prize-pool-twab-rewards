@@ -93,13 +93,13 @@ contract PrizePoolTwabRewardsTest is Test {
         promotionId = createPromotion();
         promotion = twabRewards.getPromotion(promotionId);
         // Make up the contributions for the promotion
-        mockPrizePoolContributions(vaultAddress, 0, 6, 1e18, 1e18);
-        mockPrizePoolContributions(vaultAddress, 7, 13, 1e18, 1e18);
-        mockPrizePoolContributions(vaultAddress, 14, 20, 1e18, 1e18);
-        mockPrizePoolContributions(vaultAddress, 21, 27, 1e18, 1e18);
-        mockPrizePoolContributions(vaultAddress, 28, 34, 1e18, 1e18);
-        mockPrizePoolContributions(vaultAddress, 35, 41, 1e18, 1e18);
-        mockPrizePoolContributions(vaultAddress, 42, 48, 1e18, 1e18);
+        mockPrizePoolContributions(vaultAddress, 1, 7, 1e18, 1e18);
+        mockPrizePoolContributions(vaultAddress, 8, 14, 1e18, 1e18);
+        mockPrizePoolContributions(vaultAddress, 15, 21, 1e18, 1e18);
+        mockPrizePoolContributions(vaultAddress, 22, 28, 1e18, 1e18);
+        mockPrizePoolContributions(vaultAddress, 29, 35, 1e18, 1e18);
+        mockPrizePoolContributions(vaultAddress, 36, 42, 1e18, 1e18);
+        mockPrizePoolContributions(vaultAddress, 43, 49, 1e18, 1e18);
 
     }
 
@@ -242,10 +242,10 @@ contract PrizePoolTwabRewardsTest is Test {
     /* ============ calculateDrawIdAt ============ */
 
     function testCalculateDrawIdAt() public {
-        assertEq(twabRewards.calculateDrawIdAt(firstDrawOpensAt), 0, "epoch 0");
-        assertEq(twabRewards.calculateDrawIdAt(firstDrawOpensAt + epochDuration * 2), 14, "epoch 1");
+        assertEq(twabRewards.calculateDrawIdAt(firstDrawOpensAt), 1, "epoch 0");
+        assertEq(twabRewards.calculateDrawIdAt(firstDrawOpensAt + epochDuration * 2), 15, "epoch 1");
     }
-    
+
     /* ============ endPromotion ============ */
 
     function testEndPromotion_success() public {
@@ -315,12 +315,12 @@ contract PrizePoolTwabRewardsTest is Test {
         epochIds[4] = 4;
         epochIds[5] = 5;
 
-        mockPrizePoolContributions(vaultAddress, 0, 6, 1e18, 1e18);
-        mockPrizePoolContributions(vaultAddress, 7, 13, 1e18, 1e18);
-        mockPrizePoolContributions(vaultAddress, 14, 20, 1e18, 1e18);
-        mockPrizePoolContributions(vaultAddress, 21, 27, 1e18, 1e18);
-        mockPrizePoolContributions(vaultAddress, 28, 34, 1e18, 1e18);
-        mockPrizePoolContributions(vaultAddress, 35, 41, 1e18, 1e18);
+        mockPrizePoolContributions(vaultAddress, 1, 7, 1e18, 1e18);
+        mockPrizePoolContributions(vaultAddress, 8, 14, 1e18, 1e18);
+        mockPrizePoolContributions(vaultAddress, 15, 21, 1e18, 1e18);
+        mockPrizePoolContributions(vaultAddress, 22, 28, 1e18, 1e18);
+        mockPrizePoolContributions(vaultAddress, 29, 35, 1e18, 1e18);
+        mockPrizePoolContributions(vaultAddress, 36, 42, 1e18, 1e18);
 
         uint256 totalShares = 1000e18;
         vm.startPrank(vaultAddress);
@@ -384,8 +384,8 @@ contract PrizePoolTwabRewardsTest is Test {
 
         vm.warp(numEpochsPassed * epochDuration + firstDrawOpensAt);
 
-        mockPrizePoolContributions(vaultAddress, 0, 6, 1e18, 1e18);
-        mockPrizePoolContributions(vaultAddress, 7, 13, 1e18, 1e18);
+        mockPrizePoolContributions(vaultAddress, 1, 7, 1e18, 1e18);
+        mockPrizePoolContributions(vaultAddress, 8, 14, 1e18, 1e18);
 
         twabRewards.claimRewards(vaultAddress, wallet1, promotionId, epochIds);
         twabRewards.claimRewards(vaultAddress, wallet2, promotionId, epochIds);
@@ -486,19 +486,19 @@ contract PrizePoolTwabRewardsTest is Test {
 
     function testGetVaultRewardAmount_zero_contributed() public {
         vm.warp(firstDrawOpensAt + epochDuration);
-        mockPrizePoolContributions(vaultAddress, 0, 6, 0, 1e18);
+        mockPrizePoolContributions(vaultAddress, 1, 7, 0, 1e18);
         assertEq(twabRewards.getVaultRewardAmount(vaultAddress, promotionId, 0), 0);
     }
 
     function testGetVaultRewardAmount_success() public {
         vm.warp(firstDrawOpensAt + epochDuration);
-        mockPrizePoolContributions(vaultAddress, 0, 6, 0.5e18, 1e18);
+        mockPrizePoolContributions(vaultAddress, 1, 7, 0.5e18, 1e18);
         assertEq(twabRewards.getVaultRewardAmount(vaultAddress, promotionId, 0), tokensPerEpoch / 2);
     }
 
     function testGetVaultRewardAmount_second() public {
         vm.warp(firstDrawOpensAt + epochDuration);
-        mockPrizePoolContributions(vaultAddress, 0, 6, 0.5e18, 1e18);
+        mockPrizePoolContributions(vaultAddress, 1, 7, 0.5e18, 1e18);
         assertEq(twabRewards.getVaultRewardAmount(vaultAddress, promotionId, 0), tokensPerEpoch / 2);
         assertEq(twabRewards.getVaultRewardAmount(vaultAddress, promotionId, 0), tokensPerEpoch / 2);
     }
@@ -542,10 +542,11 @@ contract PrizePoolTwabRewardsTest is Test {
         ) = twabRewards.epochRangesForPromotion(promotionId, 0);
         assertEq(epochStartTimestamp, firstDrawOpensAt, "start timestamp");
         assertEq(epochEndTimestamp, firstDrawOpensAt + epochDuration, "end timestamp");
-        assertEq(epochStartDrawId, 0, "start draw id");
-        assertEq(epochEndDrawId, epochDuration / drawPeriodSeconds - 1, "end draw id");
+        // epoch duration is one week, so that includes draws 1 - 7
+        assertEq(epochStartDrawId, 1, "start draw id");
+        assertEq(epochEndDrawId, 7, "end draw id");
     }
-    
+
     /* ============ epochRanges ============ */
 
     function testEpochRanges() public {
@@ -557,8 +558,21 @@ contract PrizePoolTwabRewardsTest is Test {
         ) = twabRewards.epochRanges(firstDrawOpensAt, epochDuration, 0);
         assertEq(epochStartTimestamp, firstDrawOpensAt, "start timestamp");
         assertEq(epochEndTimestamp, firstDrawOpensAt + epochDuration, "end timestamp");
-        assertEq(epochStartDrawId, 0, "start draw id");
-        assertEq(epochEndDrawId, epochDuration / drawPeriodSeconds - 1, "end draw id");
+        assertEq(epochStartDrawId, 1, "start draw id");
+        assertEq(epochEndDrawId, 7, "end draw id");
+    }
+
+    function testEpochRanges_oneDrawDuration() public {
+        (
+            uint48 epochStartTimestamp,
+            uint48 epochEndTimestamp,
+            uint24 epochStartDrawId,
+            uint24 epochEndDrawId
+        ) = twabRewards.epochRanges(firstDrawOpensAt, drawPeriodSeconds, 0);
+        assertEq(epochStartTimestamp, firstDrawOpensAt, "start timestamp");
+        assertEq(epochEndTimestamp, firstDrawOpensAt + drawPeriodSeconds, "end timestamp");
+        assertEq(epochStartDrawId, 1, "start draw id");
+        assertEq(epochEndDrawId, 1, "end draw id");
     }
 
     /* ============ getEpochIdNow ============ */
@@ -759,9 +773,9 @@ contract PrizePoolTwabRewardsTest is Test {
         twabController.mint(wallet2, uint96((totalShares * 1) / 4));
         vm.stopPrank();
 
-        mockPrizePoolContributions(vaultAddress, 7, 13, 1e18, 1e18);
-        mockPrizePoolContributions(vaultAddress, 14, 20, 1e18, 1e18);
-        mockPrizePoolContributions(vaultAddress, 21, 27, 1e18, 1e18);
+        mockPrizePoolContributions(vaultAddress, 8, 14, 1e18, 1e18);
+        mockPrizePoolContributions(vaultAddress, 15, 21, 1e18, 1e18);
+        mockPrizePoolContributions(vaultAddress, 22, 28, 1e18, 1e18);
 
         uint8 numEpochsPassed = 3;
         uint256 warpTime = firstDrawOpensAt + epochDuration * 4;
@@ -788,9 +802,9 @@ contract PrizePoolTwabRewardsTest is Test {
         epochIds[0] = 0;
         epochIds[1] = 1;
         epochIds[2] = 2;
-        mockPrizePoolContributions(vaultAddress, 0, 6, 0, 0);
-        mockPrizePoolContributions(vaultAddress, 7, 13, 0, 0);
-        mockPrizePoolContributions(vaultAddress, 14, 20, 0, 0);
+        mockPrizePoolContributions(vaultAddress, 1, 7, 0, 0);
+        mockPrizePoolContributions(vaultAddress, 8, 14, 0, 0);
+        mockPrizePoolContributions(vaultAddress, 15, 21, 0, 0);
         uint256 totalShares = 1000e18;
         vm.warp(firstDrawOpensAt);
         vm.startPrank(vaultAddress);
@@ -943,7 +957,7 @@ contract PrizePoolTwabRewardsTest is Test {
         twabController.delegate(vaultAddress, wallet2);
         vm.stopPrank();
 
-        mockPrizePoolContributions(vaultAddress, 0, 6, 1e18, 1e18);
+        mockPrizePoolContributions(vaultAddress, 1, 7, 1e18, 1e18);
 
         vm.warp(firstDrawOpensAt + epochDuration);
         vm.expectEmit();
@@ -960,9 +974,9 @@ contract PrizePoolTwabRewardsTest is Test {
         epochIds[1] = 1;
         epochIds[2] = 2;
 
-        mockPrizePoolContributions(vaultAddress, 0, 6, 1e18, 1e18);
-        mockPrizePoolContributions(vaultAddress, 7, 13, 1e18, 1e18);
-        mockPrizePoolContributions(vaultAddress, 14, 20, 1e18, 1e18);
+        mockPrizePoolContributions(vaultAddress, 1, 7, 1e18, 1e18);
+        mockPrizePoolContributions(vaultAddress, 8, 14, 1e18, 1e18);
+        mockPrizePoolContributions(vaultAddress, 15, 21, 1e18, 1e18);
 
         uint256 totalShares = 1000e18;
         vm.warp(firstDrawOpensAt);
@@ -1020,9 +1034,9 @@ contract PrizePoolTwabRewardsTest is Test {
         twabController.mint(wallet2, uint96((totalShares * 1) / 4));
         vm.stopPrank();
 
-        mockPrizePoolContributions(vaultAddress, 0, 6, 1e18, 1e18);
-        mockPrizePoolContributions(vaultAddress, 7, 13, 1e18, 1e18);
-        mockPrizePoolContributions(vaultAddress, 14, 20, 1e18, 1e18);
+        mockPrizePoolContributions(vaultAddress, 1, 7, 1e18, 1e18);
+        mockPrizePoolContributions(vaultAddress, 8, 14, 1e18, 1e18);
+        mockPrizePoolContributions(vaultAddress, 15, 21, 1e18, 1e18);
 
         vm.warp(firstDrawOpensAt + epochDuration * numEpochsPassed);
         twabRewards.claimRewards(vaultAddress, wallet1, promotionId, epochIds);
@@ -1063,9 +1077,9 @@ contract PrizePoolTwabRewardsTest is Test {
         twabController.mint(wallet2, uint96(totalShares / 2));
         vm.stopPrank();
 
-        mockPrizePoolContributions(vaultAddress, 0, 6, 1e18, 1e18);
-        mockPrizePoolContributions(vaultAddress, 7, 13, 1e18, 1e18);
-        mockPrizePoolContributions(vaultAddress, 14, 20, 1e18, 1e18);
+        mockPrizePoolContributions(vaultAddress, 1, 7, 1e18, 1e18);
+        mockPrizePoolContributions(vaultAddress, 8, 14, 1e18, 1e18);
+        mockPrizePoolContributions(vaultAddress, 15, 21, 1e18, 1e18);
 
         vm.warp(firstDrawOpensAt + epochDuration * 3);
         vm.expectEmit();
@@ -1082,9 +1096,9 @@ contract PrizePoolTwabRewardsTest is Test {
         twabController.mint(wallet2, uint96(totalShares / 2));
         vm.stopPrank();
 
-        mockPrizePoolContributions(vaultAddress, 0, 6, 1e18, 1e18);
-        mockPrizePoolContributions(vaultAddress, 7, 13, 1e18, 1e18);
-        mockPrizePoolContributions(vaultAddress, 14, 20, 1e18, 1e18);
+        mockPrizePoolContributions(vaultAddress, 1, 7, 1e18, 1e18);
+        mockPrizePoolContributions(vaultAddress, 8, 14, 1e18, 1e18);
+        mockPrizePoolContributions(vaultAddress, 15, 21, 1e18, 1e18);
 
         uint rewardsPerEpoch = tokensPerEpoch / 2;
 
@@ -1111,7 +1125,7 @@ contract PrizePoolTwabRewardsTest is Test {
         vm.stopPrank();
 
         // max out contributions
-        mockPrizePoolContributions(vaultAddress, 0, 6, type(uint128).max, type(uint128).max);
+        mockPrizePoolContributions(vaultAddress, 1, 7, type(uint128).max, type(uint128).max);
 
         uint rewardsPerEpoch = tokensPerEpoch / 2;
 
@@ -1132,7 +1146,7 @@ contract PrizePoolTwabRewardsTest is Test {
         vm.stopPrank();
 
         // tiny contribution, and only half
-        mockPrizePoolContributions(vaultAddress, 0, 6, 2, 4);
+        mockPrizePoolContributions(vaultAddress, 1, 7, 2, 4);
 
         uint rewardsPerEpoch = tokensPerEpoch / 2;
 
@@ -1157,7 +1171,7 @@ contract PrizePoolTwabRewardsTest is Test {
         vm.stopPrank();
 
         // max contributions
-        mockPrizePoolContributions(vaultAddress, 0, 6, type(uint128).max, type(uint128).max);
+        mockPrizePoolContributions(vaultAddress, 1, 7, type(uint128).max, type(uint128).max);
 
         uint rewardsPerEpoch = tokensPerEpoch / 2;
 
@@ -1188,9 +1202,9 @@ contract PrizePoolTwabRewardsTest is Test {
         twabController.mint(wallet1, uint96(totalShares / 2));
         vm.stopPrank();
 
-        mockPrizePoolContributions(vaultAddress, 0, 6, 1e18, 1e18);
-        mockPrizePoolContributions(vaultAddress, 7, 13, 0.5e18, 1e18);
-        mockPrizePoolContributions(vaultAddress, 14, 20, 0.25e18, 1e18);
+        mockPrizePoolContributions(vaultAddress, 1, 7, 1e18, 1e18);
+        mockPrizePoolContributions(vaultAddress, 8, 14, 0.5e18, 1e18);
+        mockPrizePoolContributions(vaultAddress, 15, 21, 0.25e18, 1e18);
 
         vm.warp(firstDrawOpensAt + epochDuration * 3);
 

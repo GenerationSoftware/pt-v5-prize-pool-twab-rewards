@@ -484,7 +484,7 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
      */
     function calculateDrawIdAt(uint64 _timestamp) public view returns (uint24) {
         if (_timestamp < _firstDrawOpensAt) return 0;
-        else return uint24((_timestamp - _firstDrawOpensAt) / _drawPeriodSeconds);
+        else return uint24((_timestamp - _firstDrawOpensAt) / _drawPeriodSeconds) + 1;
     }
 
     /**
