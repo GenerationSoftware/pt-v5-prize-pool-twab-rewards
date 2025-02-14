@@ -4,7 +4,7 @@
 [![built-with openzeppelin](https://img.shields.io/badge/built%20with-OpenZeppelin-3677FF)](https://docs.openzeppelin.com/)
 ![MIT license](https://img.shields.io/badge/license-MIT-blue)
 
-The Prize Pool Twab Rewards contract allows anyone to distribute tokens to all contributors of a [PoolTogether](https://pooltogether.com/) Prize Pool.
+The Prize Pool Twab Rewards contract allows anyone to distribute tokens to all contributors to a [PoolTogether](https://pooltogether.com/) Prize Pool.
 
 ## How it Works
 
@@ -24,8 +24,8 @@ userRewards = (usersVaultBalance / vaultTotalSupply) * (vaultContributions / tot
 
 So each user's portion of the rewards is equivalent to their portion of the vault * the vaults portion of contributions to the prize pool.
 
-[TwabController on Github](https://github.com/GenerationSoftware/pt-v5-twab-controller)
-[Prize Pool on Github](https://github.com/GenerationSoftware/pt-v5-prize-pool)
+- [TwabController on Github](https://github.com/GenerationSoftware/pt-v5-twab-controller)
+- [Prize Pool on Github](https://github.com/GenerationSoftware/pt-v5-prize-pool)
 
 ## Usage
 

@@ -104,9 +104,13 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
     /// @notice The Prize Pool used to compute the vault contributions.
     IPrizePool public immutable prizePool;
 
+    /// @notice Cached draw period seconds from the prize pool.
     uint48 internal immutable _drawPeriodSeconds;
+
+    /// @notice Cached first draw opens at timestamp from the prize pool.
     uint48 internal immutable _firstDrawOpensAt;
 
+    /// @notice The special SPONSORSHIP address constant used in the TwabController.
     address constant SPONSORSHIP_ADDRESS = address(1);
 
     /// @notice Period during which the promotion owner can't destroy a promotion.
@@ -478,11 +482,12 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
     }
 
     /**
-     * @notice Calculate the draw id at a specific timestamp.
+     * @notice Calculate the draw id at a specific timestamp. Draw ids start at 1.
      * @param _timestamp Timestamp to calculate the draw id at
      * @return Draw id
      */
     function calculateDrawIdAt(uint64 _timestamp) public view returns (uint24) {
+        // NOTE: Prize Pool draw ids start at 1; that's why we have to add one below.
         if (_timestamp < _firstDrawOpensAt) return 0;
         else return uint24((_timestamp - _firstDrawOpensAt) / _drawPeriodSeconds) + 1;
     }

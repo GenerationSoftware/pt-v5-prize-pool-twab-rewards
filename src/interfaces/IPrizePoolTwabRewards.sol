@@ -5,17 +5,15 @@ import { IERC20 } from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 
 /**
  * @notice Struct to keep track of each promotion's settings.
- * @param creator Address of the promotion creator
- * @param startTimestamp Timestamp at which the promotion starts
- * @param numberOfEpochs Number of epochs the promotion will last for
+ * @param token Address of the token to be distributed as reward
  * @param epochDuration Duration of one epoch in draws
  * @param createdAt Timestamp at which the promotion was created
- * @param token Address of the token to be distributed as reward
+ * @param numberOfEpochs Number of epochs the promotion will last for
+ * @param startTimestamp Timestamp at which the promotion starts
  * @param tokensPerEpoch Number of tokens to be distributed per epoch
  * @param rewardsUnclaimed Amount of rewards that have not been claimed yet
  */
 struct Promotion {
-    // address creator;
     IERC20 token;
     uint40 epochDuration;
     uint40 createdAt;
@@ -30,15 +28,22 @@ struct Promotion {
 /**
  * @title  PoolTogether V5 IPrizePoolTwabRewards
  * @author PoolTogether Inc. & G9 Software Inc.
- * @notice TwabRewards contract interface.
+ * @notice PrizePoolTwabRewards contract interface.
  */
 interface IPrizePoolTwabRewards {
+
+    /**
+     * @notice Returns the id of the latest created promotion. Will be 0 if no promotions have been created yet.
+     * @return Id of the latest created promotion
+     */
+    function latestPromotionId() external view returns (uint256);
+
     /**
      * @notice Creates a new promotion.
      * @param token Address of the token to be distributed
-     * @param startTimestamp Timestamp at which the promotion starts
+     * @param startTimestamp Timestamp at which the promotion starts. MUST be aligned with the Prize Pool's draw start or end times.
      * @param tokensPerEpoch Number of tokens to be distributed per epoch
-     * @param epochDuration Duration of one epoch in seconds
+     * @param epochDuration Duration of one epoch in seconds. 
      * @param numberOfEpochs Number of epochs the promotion will last for
      * @return Id of the newly created promotion
      */
@@ -51,27 +56,25 @@ interface IPrizePoolTwabRewards {
     ) external returns (uint256);
 
     /**
-     * @notice End currently active promotion and send promotion tokens back to the creator.
-     * @dev Will only send back tokens from the epochs that have not completed.
+     * @notice End currently active promotion and send promotion tokens for remaining epochs back to the creator.
      * @param promotionId Promotion id to end
-     * @param to Address that will receive the remaining tokens if there are any left
+     * @param to Address that will receive any remaining tokens
      * @return True if operation was successful
      */
     function endPromotion(uint256 promotionId, address to) external returns (bool);
 
     /**
-     * @notice Delete an inactive promotion and send promotion tokens back to the creator.
-     * @dev Will send back all the tokens that have not been claimed yet by users.
+     * @notice Delete an inactive promotion and sends back any unclaimed tokens to the creator.
      * @dev This function will revert if the promotion is still active.
      * @dev This function will revert if the grace period is not over yet.
      * @param promotionId Promotion id to destroy
-     * @param to Address that will receive the remaining tokens if there are any left
+     * @param to Address that will receive any remaining tokens
      * @return True if operation was successful
      */
     function destroyPromotion(uint256 promotionId, address to) external returns (bool);
 
     /**
-     * @notice Extend promotion by adding more epochs.
+     * @notice Extend promotion by adding more epochs. The caller must have approved the contract to transfer the tokens (numberOfEpochs * tokensPerEpoch).
      * @param promotionId Id of the promotion to extend
      * @param numberOfEpochs Number of epochs to add
      * @return True if the operation was successful
