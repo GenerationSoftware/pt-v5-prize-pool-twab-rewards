@@ -448,6 +448,7 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
             uint24 _epochStartDrawId,
             uint24 _epochEndDrawId
         ) = epochRanges(promotion.startTimestamp, promotion.epochDuration, _epochId);
+        _validateEpoch(_epochId, promotion.numberOfEpochs, _epochEndTimestamp);
         VaultEpochCache memory vaultEpochCache = _getVaultEpochCache(_promotionId, _epochId, _vault, _epochStartTimestamp, _epochEndTimestamp, _epochStartDrawId, _epochEndDrawId);
         if (vaultEpochCache.contributed == 0) {
             return 0;
@@ -720,8 +721,7 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
             uint24 _epochStartDrawId,
             uint24 _epochEndDrawId
         ) = epochRanges(_promotion.startTimestamp, _promotion.epochDuration, _epochId);
-        if (block.timestamp < _epochEndTimestamp) revert EpochNotOver(_epochEndTimestamp);
-        if (_epochId >= _promotion.numberOfEpochs) revert InvalidEpochId(_epochId, _promotion.numberOfEpochs);
+        _validateEpoch(_epochId, _promotion.numberOfEpochs, _epochEndTimestamp);
         uint256 _userAverage = twabController.getTwabBetween(
             _vault,
             _user,
@@ -775,6 +775,11 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
             ));
             _vaultEpochCaches[_promotionId][_vault][_epochId] = vaultEpochCache;
         }
+    }
+
+    function _validateEpoch(uint8 _epochId, uint8 _numberOfEpochs, uint64 _epochEndTimestamp) internal view {
+        if (block.timestamp < _epochEndTimestamp) revert EpochNotOver(_epochEndTimestamp);
+        if (_epochId >= _numberOfEpochs) revert InvalidEpochId(_epochId, _numberOfEpochs);
     }
 
     /**
