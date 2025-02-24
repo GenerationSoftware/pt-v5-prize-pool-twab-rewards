@@ -40,12 +40,6 @@ error GracePeriodActive(uint256 gracePeriodEndTimestamp);
 /// @param maxEpochs The max number of epochs that a promotion can have
 error ExceedsMaxEpochs(uint8 epochExtension, uint8 currentEpochs, uint8 maxEpochs);
 
-/// @notice Thrown if rewards for the promotion epoch have already been claimed by the user.
-/// @param promotionId The ID of the promotion
-/// @param user The address of the user that the rewards are being claimed for
-/// @param epochId The epoch that rewards are being claimed from
-error RewardsAlreadyClaimed(uint256 promotionId, address user, uint8 epochId);
-
 /// @notice Thrown if a promotion is no longer active.
 /// @param promotionId The ID of the promotion
 error PromotionInactive(uint256 promotionId);
@@ -400,9 +394,9 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
         for (uint8 index = _startEpochId; index < endEpochId; index++) {
             _epochClaimFlags = _updateClaimedEpoch(_epochClaimFlags, index);
         }
-        bytes32 _userClaimedEpochs = claimedEpochs[_promotionId][_vault][_user];
+        bytes32 _packedBits = claimedEpochs[_promotionId][_vault][_user];
         // exclude epochs already claimed by the user
-        _epochClaimFlags = _epochClaimFlags & ~_userClaimedEpochs;
+        _epochClaimFlags = _epochClaimFlags & ~_packedBits;
         return _claimRewards(_vault, _user, _promotionId, _epochClaimFlags, _startEpochId);
     }
 
@@ -561,14 +555,14 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
     function epochBytesToIdArray(bytes32 _epochClaimFlags) public pure returns (uint8[] memory) {
         uint8 count;
         for (uint256 epoch = 0; epoch < 256; ++epoch) {
-            if (_isClaimedEpoch(_epochClaimFlags, uint8(epoch))) {
+            if (_isBitSet(_epochClaimFlags, uint8(epoch))) {
                 ++count;
             }
         }
         uint8[] memory _epochIds = new uint8[](count);
         uint8 idsIndex = 0;
         for (uint256 epoch = 0; epoch < 256; ++epoch) {
-            if (_isClaimedEpoch(_epochClaimFlags, uint8(epoch))) {
+            if (_isBitSet(_epochClaimFlags, uint8(epoch))) {
                 _epochIds[idsIndex++] = uint8(epoch);
             }
         }
@@ -582,7 +576,7 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
      * @param _vault Address of the vault
      * @param _user Address of the user
      * @param _promotionId Id of the promotion
-     * @param _epochClaimFlags Word representing which epochs were claimed
+     * @param _epochClaimFlags Word representing which epochs to claim
      * @param startEpochId Id of the epoch to start claiming rewards from
      * @return Amount of tokens transferred to the recipient address
      */
@@ -595,19 +589,19 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
     ) internal returns (uint256) {
         Promotion memory _promotion = _promotions[_promotionId];
         uint256 _rewardsAmount;
-        bytes32 _userClaimedEpochs = claimedEpochs[_promotionId][_vault][_user];
+        bytes32 _packedBits = claimedEpochs[_promotionId][_vault][_user];
+
+        // Ignore epochs already claimed
+        _epochClaimFlags = _epochClaimFlags & ~_packedBits;
 
         for (uint256 index = startEpochId; index < 256; ++index) {
-            if (!_isClaimedEpoch(_epochClaimFlags, uint8(index))) {
-                continue;
+            if (_isBitSet(_epochClaimFlags, uint8(index))) {
+                _rewardsAmount += _calculateRewardAmount(_vault, _user, _promotionId, _promotion, uint8(index));
+                _packedBits = _updateClaimedEpoch(_packedBits, uint8(index));
             }
-            if (_isClaimedEpoch(_userClaimedEpochs, uint8(index)))
-                revert RewardsAlreadyClaimed(_promotionId, _user, uint8(index));
-            _rewardsAmount += _calculateRewardAmount(_vault, _user, _promotionId, _promotion, uint8(index));
-            _userClaimedEpochs = _updateClaimedEpoch(_userClaimedEpochs, uint8(index));
         }
 
-        claimedEpochs[_promotionId][_vault][_user] = _userClaimedEpochs;
+        claimedEpochs[_promotionId][_vault][_user] = _packedBits | _epochClaimFlags;
 
         _promotions[_promotionId].rewardsUnclaimed = SafeCast.toUint112(uint(_promotion.rewardsUnclaimed) - uint(_rewardsAmount));
 
@@ -819,16 +813,16 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
         We get: 0000 0001 << 2 = 0000 0100
         We then OR the mask with the word to set the value.
         We get: 0110 0011 | 0000 0100 = 0110 0111
-    * @param _userClaimedEpochs Tightly packed epoch ids with their boolean values
+    * @param _packedBits Tightly packed epoch ids with their boolean values
     * @param _epochId Id of the epoch to set the boolean for
     * @return Tightly packed epoch ids with the newly boolean value set
     */
-    function _updateClaimedEpoch(bytes32 _userClaimedEpochs, uint8 _epochId) internal pure returns (bytes32) {
-        return _userClaimedEpochs | (bytes32(uint256(1)) << _epochId);
+    function _updateClaimedEpoch(bytes32 _packedBits, uint8 _epochId) internal pure returns (bytes32) {
+        return _packedBits | (bytes32(uint256(1)) << _epochId);
     }
 
     /**
-    * @notice Check if rewards of an epoch for a given promotion have already been claimed by the user.
+    * @notice Check if a bit in a word is set
     * @dev Bits are stored in a uint256 from right to left.
         Let's take the example of the following 8 bits word. 0110 0111
         To retrieve the boolean value for the epoch id 2, we need to shift the word to the right by 2 bits.
@@ -836,12 +830,12 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
         We then get the value of the last bit by masking with 1.
         We get: 0001 1001 & 0000 0001 = 0000 0001 = 1
         We then return the boolean value true since the last bit is 1.
-    * @param _userClaimedEpochs Record of epochs already claimed by the user
-    * @param _epochId Epoch id to check
+    * @param _packedBits Word of bits to check (256 bits)
+    * @param _bitIndex Bit to check
     * @return true if the rewards have already been claimed for the given epoch, false otherwise
      */
-    function _isClaimedEpoch(bytes32 _userClaimedEpochs, uint8 _epochId) internal pure returns (bool) {
-        bool value = (uint256(_userClaimedEpochs) >> _epochId) & uint256(1) == 1;
+    function _isBitSet(bytes32 _packedBits, uint8 _bitIndex) internal pure returns (bool) {
+        bool value = (uint256(_packedBits) >> _bitIndex) & uint256(1) == 1;
         return value;
     }
 }
