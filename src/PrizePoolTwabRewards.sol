@@ -91,6 +91,7 @@ error NoEpochsToClaim(uint8 startEpochId, uint8 currentEpochId);
  * can claim rewards for each epoch. The amount each user gets is based on their portion of the Vault twab * vault contribution,
  * where the vault contribution is fraction of prize pool prizes that the vault contributed during the epoch.
  * @dev This contract does not support the use of fee on transfer tokens.
+ * @dev This contract does not support the use of rebasing tokens.
  * @dev This contract does not support tokens with rounding errors on transfers (such as stETH)
  */
 contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {

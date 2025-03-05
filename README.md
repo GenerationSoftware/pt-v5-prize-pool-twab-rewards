@@ -35,6 +35,9 @@ So each user's portion of the rewards is equivalent to their portion of the vaul
 
 ## Usage
 
+> [!WARNING]
+> Fee-on-transfer or rebasing tokens are NOT supported by this contract
+
 ### Creating the Promotion
 
 The contract supports any number of incentive "promotions". You can create a promotion by calling:
