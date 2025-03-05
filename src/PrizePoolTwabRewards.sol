@@ -92,6 +92,7 @@ error NoEpochsToClaim(uint8 startEpochId, uint8 currentEpochId);
  * where the vault contribution is fraction of prize pool prizes that the vault contributed during the epoch.
  * @dev This contract does not support the use of fee on transfer tokens.
  * @dev This contract does not support the use of rebasing tokens.
+ * @dev This contract does not support tokens with rounding errors on transfers (such as stETH)
  */
 contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
     using SafeERC20 for IERC20;
@@ -739,9 +740,10 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
 
             EpochCache memory epochCache = _getEpochCache(_promotionId, _epochId, _epochStartDrawId, _epochEndDrawId);
 
-            uint numerator = ((_promotion.tokensPerEpoch * _userAverage) / uint256(vaultEpochCache.totalSupply)) * uint256(vaultEpochCache.contributed);
-            uint denominator = (uint256(epochCache.totalContributed));
-            return numerator / denominator;
+            uint vaultPortion = uint256(_promotion.tokensPerEpoch) * uint256(vaultEpochCache.contributed) / epochCache.totalContributed;
+            uint userPortion = uint256(_userAverage) * uint256(vaultPortion) / uint256(vaultEpochCache.totalSupply);
+
+            return userPortion;
         }
         return 0;
     }
