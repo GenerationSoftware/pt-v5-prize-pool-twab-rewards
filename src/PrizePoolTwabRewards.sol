@@ -392,11 +392,8 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
         uint8 endEpochId = getEpochIdNow(_promotionId);
         if (!(endEpochId > _startEpochId)) revert NoEpochsToClaim(_startEpochId, endEpochId);
         for (uint8 index = _startEpochId; index < endEpochId; index++) {
-            _epochClaimFlags = _updateClaimedEpoch(_epochClaimFlags, index);
+            _epochClaimFlags = _setBit(_epochClaimFlags, index);
         }
-        bytes32 _packedBits = claimedEpochs[_promotionId][_vault][_user];
-        // exclude epochs already claimed by the user
-        _epochClaimFlags = _epochClaimFlags & ~_packedBits;
         return _claimRewards(_vault, _user, _promotionId, _epochClaimFlags, _startEpochId);
     }
 
@@ -542,7 +539,7 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
     function epochIdArrayToBytes(uint8[] calldata _epochIds) public pure returns (bytes32) {
         bytes32 _epochClaimFlags;
         for (uint256 index = 0; index < _epochIds.length; ++index) {
-            _epochClaimFlags = _updateClaimedEpoch(_epochClaimFlags, _epochIds[index]);
+            _epochClaimFlags = _setBit(_epochClaimFlags, _epochIds[index]);
         }
         return _epochClaimFlags;
     }
@@ -576,7 +573,7 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
      * @param _vault Address of the vault
      * @param _user Address of the user
      * @param _promotionId Id of the promotion
-     * @param _epochClaimFlags Word representing which epochs to claim
+     * @param _epochsToClaim Word representing which epochs to claim
      * @param startEpochId Id of the epoch to start claiming rewards from
      * @return Amount of tokens transferred to the recipient address
      */
@@ -584,30 +581,29 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
         address _vault,
         address _user,
         uint256 _promotionId,
-        bytes32 _epochClaimFlags,
+        bytes32 _epochsToClaim,
         uint8 startEpochId
     ) internal returns (uint256) {
         Promotion memory _promotion = _promotions[_promotionId];
         uint256 _rewardsAmount;
-        bytes32 _packedBits = claimedEpochs[_promotionId][_vault][_user];
+        bytes32 _alreadyClaimedEpochs = claimedEpochs[_promotionId][_vault][_user];
 
         // Ignore epochs already claimed
-        _epochClaimFlags = _epochClaimFlags & ~_packedBits;
+        _epochsToClaim = _epochsToClaim & ~_alreadyClaimedEpochs;
 
         for (uint256 index = startEpochId; index < 256; ++index) {
-            if (_isBitSet(_epochClaimFlags, uint8(index))) {
+            if (_isBitSet(_epochsToClaim, uint8(index))) {
                 _rewardsAmount += _calculateRewardAmount(_vault, _user, _promotionId, _promotion, uint8(index));
-                _packedBits = _updateClaimedEpoch(_packedBits, uint8(index));
             }
         }
 
-        claimedEpochs[_promotionId][_vault][_user] = _packedBits | _epochClaimFlags;
+        claimedEpochs[_promotionId][_vault][_user] = _alreadyClaimedEpochs | _epochsToClaim;
 
         _promotions[_promotionId].rewardsUnclaimed = SafeCast.toUint112(uint(_promotion.rewardsUnclaimed) - uint(_rewardsAmount));
 
         _promotion.token.safeTransfer(_user, _rewardsAmount);
 
-        emit RewardsClaimed(_promotionId, _epochClaimFlags, _vault, _user, _rewardsAmount);
+        emit RewardsClaimed(_promotionId, _epochsToClaim, _vault, _user, _rewardsAmount);
 
         return _rewardsAmount;
     }
@@ -806,19 +802,19 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
     }
 
     /**
-    * @notice Set boolean value for a specific epoch.
+    * @notice Flips a bit in a packed word of bits
     * @dev Bits are stored in a uint256 from right to left.
         Let's take the example of the following 8 bits word. 0110 0011
-        To set the boolean value to 1 for the epoch id 2, we need to create a mask by shifting 1 to the left by 2 bits.
+        To set the boolean value to 1 for the bit index 2, we need to create a mask by shifting 1 to the left by 2 bits.
         We get: 0000 0001 << 2 = 0000 0100
         We then OR the mask with the word to set the value.
         We get: 0110 0011 | 0000 0100 = 0110 0111
     * @param _packedBits Tightly packed epoch ids with their boolean values
-    * @param _epochId Id of the epoch to set the boolean for
+    * @param _bitIndex Index of the bit to flip
     * @return Tightly packed epoch ids with the newly boolean value set
     */
-    function _updateClaimedEpoch(bytes32 _packedBits, uint8 _epochId) internal pure returns (bytes32) {
-        return _packedBits | (bytes32(uint256(1)) << _epochId);
+    function _setBit(bytes32 _packedBits, uint8 _bitIndex) internal pure returns (bytes32) {
+        return _packedBits | (bytes32(uint256(1)) << _bitIndex);
     }
 
     /**
