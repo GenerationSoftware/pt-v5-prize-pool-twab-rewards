@@ -6,6 +6,17 @@
 
 The Prize Pool Twab Rewards contract allows anyone to distribute tokens to all contributors to a [PoolTogether](https://pooltogether.com/) Prize Pool.
 
+## Deployments
+
+| Chain | Address |
+| ---- | ---- |
+| Arbitrum | [0x0D51a33975024E8aFc55fde9F6b070c10AA71Dd9](https://arbiscan.io/address/0x0D51a33975024E8aFc55fde9F6b070c10AA71Dd9) |
+| Base | [0xF4c47dacFda99bE38793181af9Fd1A2Ec7576bBF](https://basescan.org/address/0xF4c47dacFda99bE38793181af9Fd1A2Ec7576bBF) |
+| Optimism | [0x36bE31E7acD4B0D755BCc7858ef04848A3eC66c6](https://optimistic.etherscan.io/address/0x36bE31E7acD4B0D755BCc7858ef04848A3eC66c6) |
+| Gnosis | [0x0D51a33975024E8aFc55fde9F6b070c10AA71Dd9](https://gnosisscan.io/address/0x0D51a33975024E8aFc55fde9F6b070c10AA71Dd9) |
+| Ethereum | [0x3341DAC0912B630F1A8c237b64F6861e9fa11d79](https://etherscan.io/address/0x3341DAC0912B630F1A8c237b64F6861e9fa11d79) |
+| Scroll | [0x0D51a33975024E8aFc55fde9F6b070c10AA71Dd9](https://scrollscan.com/address/0x0D51a33975024E8aFc55fde9F6b070c10AA71Dd9) |
+
 ## Testnet Deployment
 
 [Optimism Sepolia](https://sepolia-optimism.etherscan.io/address/0x1B7070eb6f871ba0d77470918502F8D788978FA3)
