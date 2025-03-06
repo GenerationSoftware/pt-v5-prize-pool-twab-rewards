@@ -107,7 +107,7 @@ contract PrizePoolTwabRewards is IPrizePoolTwabRewards, Multicall {
     uint48 internal immutable _firstDrawOpensAt;
 
     /// @notice The special SPONSORSHIP address constant used in the TwabController.
-    address constant SPONSORSHIP_ADDRESS = address(1);
+    address public constant SPONSORSHIP_ADDRESS = address(1);
 
     /// @notice Period during which the promotion owner can't destroy a promotion.
     uint32 public constant GRACE_PERIOD = 60 days;
