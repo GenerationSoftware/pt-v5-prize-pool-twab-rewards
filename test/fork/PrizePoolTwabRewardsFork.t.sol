@@ -17,7 +17,6 @@ import {
     PayeeZeroAddress,
     GracePeriodActive,
     ExceedsMaxEpochs,
-    RewardsAlreadyClaimed,
     PromotionInactive,
     OnlyPromotionCreator,
     EpochNotOver,

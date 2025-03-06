@@ -19,7 +19,6 @@ import {
     PayeeZeroAddress,
     GracePeriodActive,
     ExceedsMaxEpochs,
-    RewardsAlreadyClaimed,
     PromotionInactive,
     OnlyPromotionCreator,
     EpochNotOver,
@@ -1044,16 +1043,16 @@ contract PrizePoolTwabRewardsTest is Test {
         // Try to claim again:
         uint8[] memory reclaimEpochId = new uint8[](1);
         reclaimEpochId[0] = 0;
-        vm.expectRevert(abi.encodeWithSelector(RewardsAlreadyClaimed.selector, promotionId, wallet1, 0));
-        twabRewards.claimRewards(vaultAddress, wallet1, promotionId, reclaimEpochId);
+        // should be zero
+        assertEq(twabRewards.claimRewards(vaultAddress, wallet1, promotionId, reclaimEpochId), 0);
 
         reclaimEpochId[0] = 1;
-        vm.expectRevert(abi.encodeWithSelector(RewardsAlreadyClaimed.selector, promotionId, wallet1, 1));
-        twabRewards.claimRewards(vaultAddress, wallet1, promotionId, reclaimEpochId);
+        // should be zero
+        assertEq(twabRewards.claimRewards(vaultAddress, wallet1, promotionId, reclaimEpochId), 0);
 
         reclaimEpochId[0] = 2;
-        vm.expectRevert(abi.encodeWithSelector(RewardsAlreadyClaimed.selector, promotionId, wallet1, 2));
-        twabRewards.claimRewards(vaultAddress, wallet1, promotionId, reclaimEpochId);
+        // should be zero
+        assertEq(twabRewards.claimRewards(vaultAddress, wallet1, promotionId, reclaimEpochId), 0);
     }
 
     function testClaimRewards_InvalidEpochId() external {
